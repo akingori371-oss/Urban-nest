@@ -1,55 +1,175 @@
-{% extends "base.html" %}
-{% block title %}Payment card · BookIt{% endblock %}
-{% block content %}
-<a href="{% url 'my_bookings' %}" class="small">← Back to my bookings</a>
 
-<div class="card mt-2 shadow-sm">
-  <div class="card-header bg-dark text-white d-flex justify-content-between">
-    <span>Payment card · {{ booking.house.name }}</span>
-    <span>{{ booking.check_in }} → {{ booking.check_out }}</span>
-  </div>
-  <div class="card-body">
-    <div class="row text-center mb-3">
-      <div class="col"><div class="text-muted small">Total</div><div class="fs-5">${{ booking.total_price }}</div></div>
-      <div class="col"><div class="text-muted small">Paid</div><div class="fs-5 text-success">${{ paid_total }}</div></div>
-      <div class="col"><div class="text-muted small">Outstanding</div><div class="fs-5 text-danger">${{ outstanding }}</div></div>
+{% extends "base.html" %}
+
+{% block title %}Payment card · BookIt{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+
+    <a
+        href="{% url 'my_bookings' %}"
+        class="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 transition hover:text-indigo-800"
+    >
+        <span aria-hidden="true">←</span>
+        Back to my bookings
+    </a>
+
+    <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+
+        <!-- Payment card header -->
+        <div class="bg-slate-900 px-6 py-6 text-white sm:px-8">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-sm font-medium text-blue-300">
+                        BookIt · Payment card
+                    </p>
+                    <h2 class="mt-2 text-2xl font-bold">
+                        {{ booking.house.name }}
+                    </h2>
+                </div>
+
+                <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">
+                        Booking period
+                    </p>
+                    <p class="mt-1 text-sm font-semibold">
+                        {{ booking.check_in }} → {{ booking.check_out }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5 sm:p-8">
+
+            <!-- Payment summary -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <p class="text-sm font-medium text-slate-500">Total</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-900">
+                        ${{ booking.total_price }}
+                    </p>
+                </div>
+
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+                    <p class="text-sm font-medium text-emerald-700">Paid</p>
+                    <p class="mt-2 text-2xl font-bold text-emerald-700">
+                        ${{ paid_total }}
+                    </p>
+                </div>
+
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-5">
+                    <p class="text-sm font-medium text-rose-700">Outstanding</p>
+                    <p class="mt-2 text-2xl font-bold text-rose-700">
+                        ${{ outstanding }}
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Payment periods -->
+            <div class="mt-8">
+                <div class="mb-4">
+                    <h3 class="text-xl font-bold text-slate-900">
+                        Payment schedule
+                    </h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Track each payment period and manage your reviews.
+                    </p>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full min-w-[700px] divide-y divide-slate-200 text-left text-sm">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-4 font-semibold text-slate-600">#</th>
+                                <th scope="col" class="px-4 py-4 font-semibold text-slate-600">Period</th>
+                                <th scope="col" class="px-4 py-4 font-semibold text-slate-600">Amount</th>
+                                <th scope="col" class="px-4 py-4 font-semibold text-slate-600">Payment</th>
+                                <th scope="col" class="px-4 py-4 font-semibold text-slate-600">Review</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            {% for p in periods %}
+                                <tr class="transition hover:bg-slate-50">
+                                    <td class="px-4 py-4 font-semibold text-slate-700">
+                                        {{ p.number }}
+                                    </td>
+
+                                    <td class="whitespace-nowrap px-4 py-4 text-slate-600">
+                                        {{ p.start }} → {{ p.end }}
+                                    </td>
+
+                                    <td class="whitespace-nowrap px-4 py-4 font-semibold text-slate-900">
+                                        ${{ p.amount }}
+                                    </td>
+
+                                    <td class="px-4 py-4">
+                                        {% if p.paid %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                <span aria-hidden="true">✓</span>
+                                                Paid
+                                            </span>
+                                        {% else %}
+                                            <form method="post" action="{% url 'pay_period' booking.id p.number %}">
+                                                {% csrf_token %}
+                                                <button
+                                                    type="submit"
+                                                    class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                                >
+                                                    Pay
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="px-4 py-4">
+                                        {% if p.has_review %}
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                                Reviewed ✓
+                                            </span>
+                                        {% elif p.can_review %}
+                                            <a
+                                                href="{% url 'review_period' booking.id p.number %}"
+                                                class="inline-flex items-center justify-center rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-50"
+                                            >
+                                                Leave a review
+                                            </a>
+                                        {% elif not p.paid %}
+                                            <span class="text-xs text-slate-500">
+                                                Pay this period first
+                                            </span>
+                                        {% else %}
+                                            <span class="text-xs text-slate-500">
+                                                Opens {{ p.end }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="px-4 py-10 text-center">
+                                        <p class="font-semibold text-slate-700">
+                                            No payment periods available.
+                                        </p>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                    <span class="text-lg" aria-hidden="true">ℹ️</span>
+                    <p class="text-sm leading-6 text-blue-900">
+                        A review unlocks once its period has ended and been paid.
+                    </p>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <table class="table align-middle">
-      <thead>
-        <tr><th>#</th><th>Period</th><th>Amount</th><th>Payment</th><th>Review</th></tr>
-      </thead>
-      <tbody>
-      {% for p in periods %}
-        <tr>
-          <td>{{ p.number }}</td>
-          <td>{{ p.start }} → {{ p.end }}</td>
-          <td>${{ p.amount }}</td>
-          <td>
-            {% if p.paid %}
-              <span class="badge bg-success">Paid</span>
-            {% else %}
-              <form method="post" action="{% url 'pay_period' booking.id p.number %}">
-                {% csrf_token %}<button class="btn btn-sm btn-success">Pay</button>
-              </form>
-            {% endif %}
-          </td>
-          <td>
-            {% if p.has_review %}
-              <span class="badge bg-warning text-dark">Reviewed ✓</span>
-            {% elif p.can_review %}
-              <a href="{% url 'review_period' booking.id p.number %}" class="btn btn-sm btn-outline-warning">Leave a review</a>
-            {% elif not p.paid %}
-              <small class="text-muted">Pay this period first</small>
-            {% else %}
-              <small class="text-muted">Opens {{ p.end }}</small>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <p class="small text-muted mb-0">A review unlocks once its period has ended and been paid.</p>
-  </div>
 </div>
 {% endblock %}

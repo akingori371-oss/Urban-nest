@@ -1,14 +1,83 @@
+
 {% extends "base.html" %}
+
 {% block title %}Leave a review · BookIt{% endblock %}
+
 {% block content %}
-<div class="card mx-auto" style="max-width:480px"><div class="card-body">
-  <h3 class="mb-1">Leave a review</h3>
-  <p class="text-muted">{{ target_label }}</p>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button class="btn btn-primary w-100">Submit review</button>
-  </form>
-  <a href="{% url 'my_bookings' %}" class="d-block text-center mt-3 small">Cancel</a>
-</div></div>
+<div class="mx-auto max-w-lg px-4 py-12 sm:px-6">
+
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+        <div class="border-b border-slate-100 bg-slate-50 px-6 py-6 sm:px-8">
+            <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-2xl">
+                ★
+            </div>
+
+            <h2 class="text-2xl font-bold tracking-tight text-slate-900">
+                Leave a review
+            </h2>
+
+            <p class="mt-2 text-sm text-slate-500">
+                Share your experience with
+                <span class="font-medium text-slate-700">{{ target_label }}</span>.
+            </p>
+        </div>
+
+        <div class="px-6 py-6 sm:px-8">
+
+            <form method="post" class="space-y-5">
+                {% csrf_token %}
+
+                {% for field in form %}
+                    <div>
+                        <label
+                            for="{{ field.id_for_label }}"
+                            class="mb-2 block text-sm font-medium text-slate-700"
+                        >
+                            {{ field.label }}
+                        </label>
+
+                        {{ field }}
+
+                        {% if field.help_text %}
+                            <p class="mt-1 text-xs text-slate-500">
+                                {{ field.help_text }}
+                            </p>
+                        {% endif %}
+
+                        {% for error in field.errors %}
+                            <p class="mt-1 text-sm text-rose-600">
+                                {{ error }}
+                            </p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                {% if form.non_field_errors %}
+                    <div class="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+                        {% for error in form.non_field_errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <button
+                    type="submit"
+                    class="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                >
+                    Submit review
+                </button>
+            </form>
+
+            <a
+                href="{% url 'my_bookings' %}"
+                class="mt-5 block text-center text-sm font-medium text-slate-500 transition hover:text-indigo-600"
+            >
+                Cancel and return to my bookings
+            </a>
+
+        </div>
+    </div>
+
+</div>
 {% endblock %}

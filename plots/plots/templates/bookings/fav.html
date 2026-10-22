@@ -1,22 +1,101 @@
+
 {% extends "base.html" %}
+
 {% block title %}Favorites · BookIt{% endblock %}
+
 {% block content %}
-<h2>My favorites</h2>
-<div class="row">
-{% for h in houses %}
-  <div class="col-md-4 mb-3">
-    <div class="card h-100 shadow-sm"><div class="card-body">
-      <h5>{{ h.name }}</h5>
-      <p class="mb-1">{{ h.location }} · {{ h.bedrooms }} bedroom{{ h.bedrooms|pluralize }}</p>
-      <p class="fw-bold">${{ h.price_per_night }} / night</p>
-      <a href="{% url 'book' %}?house={{ h.id }}" class="btn btn-primary btn-sm">Book</a>
-      <form method="post" action="{% url 'toggle_favorite' h.id %}" class="d-inline">
-        {% csrf_token %}<button class="btn btn-outline-danger btn-sm">♥ Remove</button>
-      </form>
-    </div></div>
-  </div>
-{% empty %}
-  <p>No favorites yet. Tap ♡ Save on any apartment.</p>
-{% endfor %}
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+
+    <div class="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wider text-indigo-600">
+                Your saved apartments
+            </p>
+            <h2 class="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+                My favorites
+            </h2>
+            <p class="mt-2 text-slate-600">
+                Keep track of the apartments you love and book when you're ready.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+        {% for h in houses %}
+            <article class="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg">
+
+                <div class="flex h-32 items-center justify-center bg-gradient-to-br from-indigo-100 via-blue-50 to-slate-100">
+                    <span class="text-5xl" aria-hidden="true">🏡</span>
+                </div>
+
+                <div class="flex flex-1 flex-col p-6">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-slate-900">
+                            {{ h.name }}
+                        </h3>
+
+                        <p class="mt-2 flex items-start gap-2 text-sm text-slate-500">
+                            <span aria-hidden="true">📍</span>
+                            <span>{{ h.location }}</span>
+                        </p>
+
+                        <p class="mt-3 text-sm text-slate-600">
+                            {{ h.bedrooms }} bedroom{{ h.bedrooms|pluralize }}
+                        </p>
+
+                        <div class="mt-5">
+                            <p class="text-2xl font-bold text-indigo-700">
+                                ${{ h.price_per_night }}
+                            </p>
+                            <p class="text-sm text-slate-500">per night</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        <a
+                            href="{% url 'book' %}?house={{ h.id }}"
+                            class="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        >
+                            Book apartment
+                        </a>
+
+                        <form method="post" action="{% url 'toggle_favorite' h.id %}">
+                            {% csrf_token %}
+                            <button
+                                type="submit"
+                                class="inline-flex items-center justify-center rounded-lg border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                            >
+                                ♥ Remove
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </article>
+        {% empty %}
+            <div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-3xl">
+                    ♡
+                </div>
+
+                <h3 class="mt-5 text-xl font-bold text-slate-900">
+                    No favorites yet
+                </h3>
+
+                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    You haven't saved any apartments yet. Explore available homes and save the ones you like.
+                </p>
+
+                <a
+                    href="{% url 'houses' %}"
+                    class="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                    Explore apartments
+                </a>
+            </div>
+        {% endfor %}
+
+    </div>
 </div>
 {% endblock %}

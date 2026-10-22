@@ -1,28 +1,133 @@
+
 {% extends "base.html" %}
+
 {% block title %}Analytics · BookIt{% endblock %}
+
 {% block content %}
-<h2>Analytics</h2>
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
 
-<div class="row text-center mb-4">
-  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
-    <div class="text-muted small">Revenue collected</div><div class="fs-4">${{ total_revenue }}</div></div></div></div>
-  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
-    <div class="text-muted small">Bookings</div><div class="fs-4">{{ total_bookings }}</div></div></div></div>
-  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
-    <div class="text-muted small">Guests</div><div class="fs-4">{{ total_users }}</div></div></div></div>
-  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
-    <div class="text-muted small">Outstanding payments</div><div class="fs-4 text-danger">${{ outstanding }}</div></div></div></div>
-</div>
+    <div class="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="mb-2 text-sm font-semibold uppercase tracking-wider text-blue-600">
+                BookIt Administration
+            </p>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                Analytics Dashboard
+            </h1>
+            <p class="mt-2 text-sm text-slate-500">
+                Monitor revenue, bookings, guests, and outstanding payments.
+            </p>
+        </div>
 
-<div class="row">
-{% for c in charts %}
-  <div class="col-lg-6 mb-4">
-    <div class="card shadow-sm"><div class="card-body">
-      {{ c|safe }}
-    </div></div>
-  </div>
-{% empty %}
-  <p class="text-muted">No data to plot yet.</p>
-{% endfor %}
+        <div class="inline-flex items-center gap-2 self-start rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
+            <span class="h-2 w-2 rounded-full bg-blue-500"></span>
+            Overview
+        </div>
+    </div>
+
+    <div class="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-slate-500">Revenue collected</p>
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-xl text-emerald-600">
+                    $
+                </span>
+            </div>
+            <p class="mt-5 text-3xl font-bold tracking-tight text-slate-900">
+                ${{ total_revenue }}
+            </p>
+            <p class="mt-2 text-xs text-slate-500">Total revenue recorded</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-slate-500">Bookings</p>
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600">
+                    ↗
+                </span>
+            </div>
+            <p class="mt-5 text-3xl font-bold tracking-tight text-slate-900">
+                {{ total_bookings }}
+            </p>
+            <p class="mt-2 text-xs text-slate-500">Total bookings recorded</p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-slate-500">Guests</p>
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-xl text-violet-600">
+                    ♙
+                </span>
+            </div>
+            <p class="mt-5 text-3xl font-bold tracking-tight text-slate-900">
+                {{ total_users }}
+            </p>
+            <p class="mt-2 text-xs text-slate-500">Registered users</p>
+        </div>
+
+        <div class="rounded-2xl border border-red-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-slate-500">Outstanding payments</p>
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-xl text-red-600">
+                    !
+                </span>
+            </div>
+            <p class="mt-5 text-3xl font-bold tracking-tight text-red-600">
+                ${{ outstanding }}
+            </p>
+            <p class="mt-2 text-xs text-slate-500">Payments still outstanding</p>
+        </div>
+
+    </div>
+
+    <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-xl font-bold text-slate-900">Reports and charts</h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Visual summaries generated from your analytics data.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        {% for c in charts %}
+            <div class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div class="mb-4 flex items-center gap-3">
+                    <span class="h-8 w-1 rounded-full bg-blue-600"></span>
+                    <h3 class="font-semibold text-slate-800">Analytics report</h3>
+                </div>
+
+                <div class="w-full overflow-x-auto">
+                    {{ c|safe }}
+                </div>
+            </div>
+        {% empty %}
+            <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center lg:col-span-2">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl text-slate-500">
+                    ▥
+                </div>
+                <h3 class="mt-4 text-lg font-semibold text-slate-900">
+                    No analytics available yet
+                </h3>
+                <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    There is no chart data to display yet. Once data becomes available,
+                    your reports will appear here.
+                </p>
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <div class="mt-8 rounded-2xl border border-slate-200 bg-slate-100/70 p-5 sm:p-6">
+        <h3 class="font-semibold text-slate-800">About these figures</h3>
+        <p class="mt-2 text-sm leading-6 text-slate-600">
+            These figures are supplied by your Django analytics view. Their accuracy
+            depends on how revenue, bookings, registered users, and outstanding
+            payments are calculated in your backend.
+        </p>
+    </div>
+
 </div>
 {% endblock %}

@@ -1,13 +1,170 @@
+
 {% extends "base.html" %}
+
 {% block title %}Sign up · BookIt{% endblock %}
+
+{% block head %}
+<style>
+    .signup-background {
+        background:
+            linear-gradient(rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.82)),
+            url("https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=2000&q=85");
+        background-size: cover;
+        background-position: center;
+    }
+
+    .signup-form p {
+        margin-bottom: 1rem;
+    }
+
+    .signup-form label {
+        display: block;
+        margin-bottom: 0.4rem;
+        color: #334155;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .signup-form input,
+    .signup-form select,
+    .signup-form textarea {
+        width: 100%;
+        padding: 0.75rem 0.875rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.625rem;
+        background: white;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .signup-form input:focus,
+    .signup-form select:focus,
+    .signup-form textarea:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .signup-form .helptext {
+        display: block;
+        margin-top: 0.4rem;
+        color: #64748b;
+        font-size: 0.75rem;
+    }
+
+    .signup-form .errorlist {
+        margin: 0.35rem 0;
+        color: #dc2626;
+        font-size: 0.8rem;
+    }
+
+    .signup-form ul:not(.errorlist) {
+        margin-top: 0.5rem;
+        padding-left: 1.25rem;
+        color: #64748b;
+        font-size: 0.75rem;
+        list-style: disc;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="card mx-auto" style="max-width:420px"><div class="card-body">
-  <h3 class="mb-3">Create an account</h3>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button class="btn btn-primary w-100">Sign up</button>
-  </form>
-  <p class="mt-3 mb-0 text-center">Already registered? <a href="{% url 'login' %}">Log in</a></p>
-</div></div>
+<section class="signup-background px-4 py-12 sm:px-6 md:py-20 lg:px-8">
+    <div class="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+
+        <div class="hidden text-white lg:block">
+            <a href="{% url 'landing' %}" class="mb-8 inline-flex items-center gap-3">
+                <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-bold backdrop-blur">B</span>
+                <span class="text-2xl font-bold tracking-tight">BookIt</span>
+            </a>
+
+            <p class="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-indigo-200">
+                Your next stay starts here
+            </p>
+
+            <h1 class="max-w-xl text-4xl font-bold leading-tight xl:text-5xl">
+                Find a place that feels like home.
+            </h1>
+
+            <p class="mt-5 max-w-lg text-lg leading-8 text-slate-200">
+                Create your account to discover comfortable homes, manage your bookings,
+                and make your next stay simple.
+            </p>
+
+            <div class="mt-10 space-y-5">
+                <div class="flex items-start gap-4">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">✓</span>
+                    <div>
+                        <h3 class="font-semibold">Discover great places</h3>
+                        <p class="mt-1 text-sm text-slate-300">Explore homes suited to your needs and budget.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-4">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">✓</span>
+                    <div>
+                        <h3 class="font-semibold">Keep bookings organized</h3>
+                        <p class="mt-1 text-sm text-slate-300">Manage your reservations from one account.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-4">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">✓</span>
+                    <div>
+                        <h3 class="font-semibold">Enjoy a simpler experience</h3>
+                        <p class="mt-1 text-sm text-slate-300">Your next stay is only a few steps away.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mx-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-9">
+            <div class="mb-8">
+                <a href="{% url 'landing' %}" class="mb-6 inline-flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 lg:hidden">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">B</span>
+                    BookIt
+                </a>
+
+                <p class="mb-2 text-sm font-semibold text-indigo-600">GET STARTED FOR FREE</p>
+
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900">
+                    Create your account
+                </h2>
+
+                <p class="mt-2 text-sm leading-6 text-slate-500">
+                    Enter your details below to get started with BookIt.
+                </p>
+            </div>
+
+            <form method="post" class="signup-form">
+                {% csrf_token %}
+
+                {{ form.as_p }}
+
+                <button type="submit"
+                    class="mt-3 w-full rounded-xl bg-indigo-600 px-5 py-3.5 font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200">
+                    Create account
+                </button>
+            </form>
+
+            <div class="my-6 flex items-center gap-4">
+                <div class="h-px flex-1 bg-slate-200"></div>
+                <span class="text-xs text-slate-400">ALREADY A MEMBER?</span>
+                <div class="h-px flex-1 bg-slate-200"></div>
+            </div>
+
+            <p class="text-center text-sm text-slate-600">
+                Already registered?
+                <a href="{% url 'login' %}" class="font-semibold text-indigo-600 hover:text-indigo-800">
+                    Log in
+                </a>
+            </p>
+
+            <p class="mt-6 text-center text-xs leading-5 text-slate-400">
+                By creating an account, you agree to follow BookIt's terms and policies.
+            </p>
+        </div>
+
+    </div>
+</section>
 {% endblock %}
