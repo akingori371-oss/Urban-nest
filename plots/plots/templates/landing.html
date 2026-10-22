@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-5">Find a free apartment</h1>
+  <p class="lead">Search by date, book in minutes, and pay monthly for long stays.</p>
+  <a href="{% url 'login' %}" class="btn btn-primary btn-lg me-2">Log in</a>
+  <a href="{% url 'signup' %}" class="btn btn-outline-primary btn-lg">Sign up</a>
+</div>
+
+<div class="row text-center mt-4">
+  <div class="col-md-4"><h5>Search by date</h5><p class="text-muted">Only apartments that are free for your dates are shown.</p></div>
+  <div class="col-md-4"><h5>Short or long stays</h5><p class="text-muted">Pay at check-out, or monthly with a payment card for stays over 30 nights.</p></div>
+  <div class="col-md-4"><h5>Reviews and updates</h5><p class="text-muted">Review your stay and get announcements from the owner.</p></div>
+</div>
+{% endblock %}
