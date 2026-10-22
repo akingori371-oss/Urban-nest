@@ -50,11 +50,13 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'plots.urls'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'landing'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'plots' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

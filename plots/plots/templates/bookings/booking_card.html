@@ -29,7 +29,7 @@
             {% if p.paid %}
               <span class="badge bg-success">Paid</span>
             {% else %}
-              <form method="post" action="{% url 'pay_period' p.id %}">
+              <form method="post" action="{% url 'pay_period' booking.id p.number %}">
                 {% csrf_token %}<button class="btn btn-sm btn-success">Pay</button>
               </form>
             {% endif %}
@@ -38,7 +38,7 @@
             {% if p.has_review %}
               <span class="badge bg-warning text-dark">Reviewed ✓</span>
             {% elif p.can_review %}
-              <a href="{% url 'review_period' p.id %}" class="btn btn-sm btn-outline-warning">Leave a review</a>
+              <a href="{% url 'review_period' booking.id p.number %}" class="btn btn-sm btn-outline-warning">Leave a review</a>
             {% elif not p.paid %}
               <small class="text-muted">Pay this period first</small>
             {% else %}
