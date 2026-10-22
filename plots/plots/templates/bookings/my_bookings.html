@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}My bookings · BookIt{% endblock %}
+{% block content %}
+<h2>My bookings</h2>
+
+{% for b in bookings %}
+<div class="card mb-3 shadow-sm"><div class="card-body">
+  <div class="d-flex justify-content-between">
+    <div>
+      <h5 class="mb-1">{{ b.house.name }}
+        {% if b.is_long %}<span class="badge bg-info text-dark">Long stay</span>
+        {% else %}<span class="badge bg-secondary">Short stay</span>{% endif %}
+      </h5>
+      <p class="mb-1">{{ b.check_in }} → {{ b.check_out }} · {{ b.nights }} night{{ b.nights|pluralize }} · <strong>${{ b.total_price }}</strong></p>
+    </div>
+    <div>
+      {% if b.status == "confirmed" %}<span class="badge bg-success">Confirmed</span>
+      {% else %}<span class="badge bg-dark">Cancelled</span>{% endif %}
+    </div>
+  </div>
+
+  {% if b.status == "confirmed" %}
+    <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+      {% if b.is_long %}
+        <a href="{% url 'booking_card' b.id %}" class="btn btn-sm btn-primary">
+          Payment card
+          {% if b.unpaid_count %}<span class="badge bg-warning text-dark">{{ b.unpaid_count }} due</span>{% endif %}
+        </a>
+      {% else %}
+        {% if b.paid %}
+          <span class="badge bg-success">Paid</span>
+        {% else %}
+          <form method="post" action="{% url 'pay_booking' b.id %}">
+            {% csrf_token %}<button class="btn btn-sm btn-success">Pay ${{ b.total_price }}</button>
+          </form>
+        {% endif %}
+
+        {% if b.has_review %}
+          <span class="badge bg-warning text-dark">Reviewed ✓</span>
+        {% elif b.can_review %}
+          <a href="{% url 'review_booking' b.id %}" class="btn btn-sm btn-outline-warning">Leave a review</a>
+        {% else %}
+          <small class="text-muted">Review opens at check-out ({{ b.check_out }})</small>
+        {% endif %}
+      {% endif %}
+
+      <form method="post" action="{% url 'cancel_booking' b.id %}" class="ms-auto">
+        {% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Cancel booking</button>
+      </form>
+    </div>
+  {% endif %}
+</div></div>
+{% empty %}
+  <p>No bookings yet. <a href="{% url 'houses' %}">Find an apartment</a>.</p>
+{% endfor %}
+{% endblock %}

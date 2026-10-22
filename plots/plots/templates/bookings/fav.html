@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Favorites · BookIt{% endblock %}
+{% block content %}
+<h2>My favorites</h2>
+<div class="row">
+{% for h in houses %}
+  <div class="col-md-4 mb-3">
+    <div class="card h-100 shadow-sm"><div class="card-body">
+      <h5>{{ h.name }}</h5>
+      <p class="mb-1">{{ h.location }} · {{ h.bedrooms }} bedroom{{ h.bedrooms|pluralize }}</p>
+      <p class="fw-bold">${{ h.price_per_night }} / night</p>
+      <a href="{% url 'book' %}?house={{ h.id }}" class="btn btn-primary btn-sm">Book</a>
+      <form method="post" action="{% url 'toggle_favorite' h.id %}" class="d-inline">
+        {% csrf_token %}<button class="btn btn-outline-danger btn-sm">♥ Remove</button>
+      </form>
+    </div></div>
+  </div>
+{% empty %}
+  <p>No favorites yet. Tap ♡ Save on any apartment.</p>
+{% endfor %}
+</div>
+{% endblock %}

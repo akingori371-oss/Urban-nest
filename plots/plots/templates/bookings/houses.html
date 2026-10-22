@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Find apartments · BookIt{% endblock %}
+{% block content %}
+<h2>Find a free apartment</h2>
+
+<form method="get" class="row g-2 mb-4">
+  <div class="col-md-3">
+    <label class="form-label small mb-0">Check-in</label>
+    <input type="date" name="check_in" value="{{ check_in }}" class="form-control">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small mb-0">Check-out</label>
+    <input type="date" name="check_out" value="{{ check_out }}" class="form-control">
+  </div>
+  <div class="col-md-3 d-flex align-items-end">
+    <button class="btn btn-primary me-2">Search</button>
+    <a href="{% url 'houses' %}" class="btn btn-outline-secondary">Clear</a>
+  </div>
+</form>
+
+{% if searched %}<p class="text-muted">Showing only apartments free for your dates.</p>{% endif %}
+
+<div class="row">
+{% for h in houses %}
+  <div class="col-md-4 mb-3">
+    <div class="card h-100 shadow-sm"><div class="card-body">
+      <h5 class="card-title">{{ h.name }}</h5>
+      <p class="mb-1">{{ h.location }} · {{ h.bedrooms }} bedroom{{ h.bedrooms|pluralize }}</p>
+      <p class="mb-1 text-warning">
+        {% if h.avg_rating %}★ {{ h.avg_rating|floatformat:1 }} <span class="text-muted">({{ h.review_count }})</span>
+        {% else %}<span class="text-muted">No reviews yet</span>{% endif %}
+      </p>
+      <p class="fw-bold">${{ h.price_per_night }} / night</p>
+      <p class="text-muted small">{{ h.description }}</p>
+    </div>
+    <div class="card-footer bg-white border-0">
+      <a href="{% url 'book' %}?house={{ h.id }}&check_in={{ check_in }}&check_out={{ check_out }}" class="btn btn-primary btn-sm">Book</a>
+      <form method="post" action="{% url 'toggle_favorite' h.id %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger btn-sm">{% if h.id in favs %}♥ Saved{% else %}♡ Save{% endif %}</button>
+      </form>
+    </div></div>
+  </div>
+{% empty %}
+  <p>No apartments are free for those dates.</p>
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Analytics · BookIt{% endblock %}
+{% block content %}
+<h2>Analytics</h2>
+
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
+    <div class="text-muted small">Revenue collected</div><div class="fs-4">${{ total_revenue }}</div></div></div></div>
+  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
+    <div class="text-muted small">Bookings</div><div class="fs-4">{{ total_bookings }}</div></div></div></div>
+  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
+    <div class="text-muted small">Guests</div><div class="fs-4">{{ total_users }}</div></div></div></div>
+  <div class="col-md-3 mb-2"><div class="card"><div class="card-body">
+    <div class="text-muted small">Outstanding payments</div><div class="fs-4 text-danger">${{ outstanding }}</div></div></div></div>
+</div>
+
+<div class="row">
+{% for c in charts %}
+  <div class="col-lg-6 mb-4">
+    <div class="card shadow-sm"><div class="card-body">
+      {{ c|safe }}
+    </div></div>
+  </div>
+{% empty %}
+  <p class="text-muted">No data to plot yet.</p>
+{% endfor %}
+</div>
+{% endblock %}

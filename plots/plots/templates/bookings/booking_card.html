@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Payment card · BookIt{% endblock %}
+{% block content %}
+<a href="{% url 'my_bookings' %}" class="small">← Back to my bookings</a>
+
+<div class="card mt-2 shadow-sm">
+  <div class="card-header bg-dark text-white d-flex justify-content-between">
+    <span>Payment card · {{ booking.house.name }}</span>
+    <span>{{ booking.check_in }} → {{ booking.check_out }}</span>
+  </div>
+  <div class="card-body">
+    <div class="row text-center mb-3">
+      <div class="col"><div class="text-muted small">Total</div><div class="fs-5">${{ booking.total_price }}</div></div>
+      <div class="col"><div class="text-muted small">Paid</div><div class="fs-5 text-success">${{ paid_total }}</div></div>
+      <div class="col"><div class="text-muted small">Outstanding</div><div class="fs-5 text-danger">${{ outstanding }}</div></div>
+    </div>
+
+    <table class="table align-middle">
+      <thead>
+        <tr><th>#</th><th>Period</th><th>Amount</th><th>Payment</th><th>Review</th></tr>
+      </thead>
+      <tbody>
+      {% for p in periods %}
+        <tr>
+          <td>{{ p.number }}</td>
+          <td>{{ p.start }} → {{ p.end }}</td>
+          <td>${{ p.amount }}</td>
+          <td>
+            {% if p.paid %}
+              <span class="badge bg-success">Paid</span>
+            {% else %}
+              <form method="post" action="{% url 'pay_period' p.id %}">
+                {% csrf_token %}<button class="btn btn-sm btn-success">Pay</button>
+              </form>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.has_review %}
+              <span class="badge bg-warning text-dark">Reviewed ✓</span>
+            {% elif p.can_review %}
+              <a href="{% url 'review_period' p.id %}" class="btn btn-sm btn-outline-warning">Leave a review</a>
+            {% elif not p.paid %}
+              <small class="text-muted">Pay this period first</small>
+            {% else %}
+              <small class="text-muted">Opens {{ p.end }}</small>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="small text-muted mb-0">A review unlocks once its period has ended and been paid.</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Book · BookIt{% endblock %}
+{% block content %}
+<div class="card mx-auto" style="max-width:480px"><div class="card-body">
+  <h3 class="mb-3">Make a booking</h3>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary w-100">Confirm booking</button>
+  </form>
+  <hr>
+  <p class="small text-muted mb-0">
+    <strong>Short stays (30 nights or less):</strong> pay at check-out, or in advance if you like.<br>
+    <strong>Long stays (over 30 nights):</strong> you get a payment card with one payment per 30-day period.
+  </p>
+</div></div>
+{% endblock %}

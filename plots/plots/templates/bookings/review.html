@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Leave a review · BookIt{% endblock %}
+{% block content %}
+<div class="card mx-auto" style="max-width:480px"><div class="card-body">
+  <h3 class="mb-1">Leave a review</h3>
+  <p class="text-muted">{{ target_label }}</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary w-100">Submit review</button>
+  </form>
+  <a href="{% url 'my_bookings' %}" class="d-block text-center mt-3 small">Cancel</a>
+</div></div>
+{% endblock %}

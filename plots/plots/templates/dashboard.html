@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · BookIt{% endblock %}
+
+{% block head %}
+  {# Optional: uncomment so new announcements appear without a manual refresh #}
+  {# <meta http-equiv="refresh" content="15"> #}
+{% endblock %}
+
+{% block content %}
+<h2>Hello, {{ user.username }}</h2>
+
+{% if due_count %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+  <span>You have <strong>{{ due_count }}</strong> payment{{ due_count|pluralize }} due on your payment card.</span>
+  <a href="{% url 'my_bookings' %}" class="btn btn-sm btn-warning">View</a>
+</div>
+{% endif %}
+
+<h5 class="mt-4">Announcements</h5>
+{% for a in announcements %}
+  <div class="card mb-2 border-primary"><div class="card-body">
+    <h6 class="card-title mb-1">{{ a.title }}</h6>
+    <p class="mb-1">{{ a.message }}</p>
+    <small class="text-muted">{{ a.created_at|date:"j M Y, H:i" }}</small>
+  </div></div>
+{% empty %}
+  <p class="text-muted">No announcements right now.</p>
+{% endfor %}
+
+<div class="mt-4">
+  <a href="{% url 'houses' %}" class="btn btn-primary me-2">Find an apartment</a>
+  <a href="{% url 'my_bookings' %}" class="btn btn-outline-primary me-2">My bookings</a>
+  <a href="{% url 'favorites' %}" class="btn btn-outline-danger">Favorites</a>
+  {% if user.is_superuser %}
+    <a href="{% url 'analytics' %}" class="btn btn-warning ms-2">Analytics</a>
+  {% endif %}
+</div>
+{% endblock %}
