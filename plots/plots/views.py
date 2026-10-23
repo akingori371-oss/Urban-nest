@@ -16,6 +16,52 @@ DUMMY_HOUSES = [
      "price_per_night": 90, "description": "Quiet with a garden.", "avg_rating": 4.0, "review_count": 3},
 ]
 
+DEFAULT_BOOKINGS = [
+    {"id": 1, "house_id": 2, "house": {"id": 2, "name": "City Loft"}, "check_in": "2026-10-01", "check_out": "2026-10-05",
+     "nights": 4, "total_price": 200, "status": "confirmed", "is_long": False,
+     "paid": False, "has_review": False, "can_review": True},
+    {"id": 2, "house_id": 1, "house": {"id": 1, "name": "Sunset Villa"}, "check_in": "2026-09-01", "check_out": "2026-12-01",
+     "nights": 91, "total_price": 10920, "status": "confirmed", "is_long": True,
+     "unpaid_count": 2},
+]
+
+
+def _parse_iso_date(value):
+    if not value:
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _find_conflicting_houses(request, check_in, check_out):
+    conflicts = set()
+    bookings = list(DEFAULT_BOOKINGS)
+    bookings.extend(request.session.get("created_bookings", []))
+
+    for booking in bookings:
+        if booking.get("status") == "cancelled":
+            continue
+
+        booking_check_in = _parse_iso_date(booking.get("check_in"))
+        booking_check_out = _parse_iso_date(booking.get("check_out"))
+        if booking_check_in is None or booking_check_out is None:
+            continue
+
+        if booking_check_in < check_out and check_in < booking_check_out:
+            house_id = booking.get("house_id")
+            if house_id is None:
+                house = booking.get("house") or {}
+                house_id = house.get("id")
+            if house_id is not None:
+                conflicts.add(int(house_id))
+
+    return conflicts
+
+
 def landing(request):
     return render(request , "landing.html")
 
@@ -35,12 +81,22 @@ def dashboard(request):
     }
     return render(request , "dashboard.html" , context)
 def house_list(request):
+    check_in_raw = request.GET.get("check_in")
+    check_out_raw = request.GET.get("check_out")
+    check_in = _parse_iso_date(check_in_raw)
+    check_out = _parse_iso_date(check_out_raw)
+    houses = DUMMY_HOUSES
+
+    if check_in and check_out and check_in < check_out:
+        unavailable_houses = _find_conflicting_houses(request, check_in, check_out)
+        houses = [house for house in DUMMY_HOUSES if house["id"] not in unavailable_houses]
+
     return render(request , "bookings/houses.html" , {
-        "houses":DUMMY_HOUSES,
+        "houses": houses,
         "favs":set(request.session.get("favorite_ids", [])),
-        "searched":bool(request.GET.get("check_in") or request.GET.get("check_out")),
-        "check_in":request.GET.get("check_in", ""),
-        "check_out":request.GET.get("check_out", ""),
+        "searched":bool(check_in_raw or check_out_raw),
+        "check_in": check_in_raw or "",
+        "check_out": check_out_raw or "",
     })
 def book(request):
     form = BookingForm(
@@ -59,7 +115,8 @@ def book(request):
         booking_id = max((b["id"] for b in bookings), default=99) + 1
         bookings.append({
             "id": booking_id,
-            "house": {"name": house["name"]},
+            "house_id": house["id"],
+            "house": {"id": house["id"], "name": house["name"]},
             "check_in": form.cleaned_data["check_in"].isoformat(),
             "check_out": form.cleaned_data["check_out"].isoformat(),
             "nights": nights,
@@ -78,10 +135,10 @@ def book(request):
     return render(request, "bookings/book.html", {"form": form})
 def my_bookings(request):
     bookings = [
-        {"id": 1, "house": {"name": "City Loft"}, "check_in": "2026-10-01", "check_out": "2026-10-05",
+        {"id": 1, "house_id": 2, "house": {"id": 2, "name": "City Loft"}, "check_in": "2026-10-01", "check_out": "2026-10-05",
         "nights": 4, "total_price": 200, "status": "confirmed", "is_long": False,
         "paid": False, "has_review": False, "can_review": True},
-        {"id": 2, "house": {"name": "Sunset Villa"}, "check_in": "2026-09-01", "check_out": "2026-12-01",
+        {"id": 2, "house_id": 1, "house": {"id": 1, "name": "Sunset Villa"}, "check_in": "2026-09-01", "check_out": "2026-12-01",
         "nights": 91, "total_price": 10920, "status": "confirmed", "is_long": True,
         "unpaid_count": 2},
     ]

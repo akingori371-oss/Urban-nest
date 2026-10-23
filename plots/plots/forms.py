@@ -12,12 +12,15 @@ class BookingForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"}),
     )
 
-    def __init__(self, *args, houses, **kwargs):
+    def __init__(self, *args, houses=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["house"].choices = [
-            (str(house["id"]), f'{house["name"]} — ${house["price_per_night"]}/night')
-            for house in houses
-        ]
+        choices = []
+        if houses is not None:
+            choices = [
+                (str(house["id"]), f'{house["name"]} — ${house["price_per_night"]}/night')
+                for house in houses
+            ]
+        self.fields["house"].choices = choices
 
     def clean(self):
         cleaned_data = super().clean()
