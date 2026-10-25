@@ -18,11 +18,11 @@ urlpatterns = [
     path("bookings/book/", views.book, name="book"),
     path("bookings/mine/", views.my_bookings, name="my_bookings"),
     path("bookings/card/<int:pk>/", views.booking_card, name="booking_card"),
-    path("bookings/favorites/", views.favourites, name="favorites"),
+    path("bookings/favorites/", views.Favorite, name="favorites"),
     path("bookings/review/booking/<int:pk>/", views.review_booking, name="review_booking"),
     path("bookings/review/period/<int:booking_pk>/<int:period_pk>/", views.review_period, name="review_period"),
     path("bookings/cancel/<int:pk>/", views.cancel_booking, name="cancel_booking"),
     path("bookings/pay/booking/<int:pk>/", views.pay_booking, name="pay_booking"),
     path("bookings/pay/period/<int:booking_pk>/<int:period_pk>/", views.pay_period, name="pay_period"),
-    path("bookings/favorite/<int:pk>/", views.toggle_favourite, name="toggle_favorite"),
+    path("bookings/favorite/<int:pk>/", views.toggle_favorite, name="toggle_favorite"),
 ]
