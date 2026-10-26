@@ -1,38 +1,28 @@
 from django import forms
+from django.utils import timezone
+from .models import Booking
 
-
-class BookingForm(forms.Form):
-    house = forms.ChoiceField(label="Apartment")
-    check_in = forms.DateField(
-        label="Check-in",
-        widget=forms.DateInput(attrs={"type": "date"}),
-    )
-    check_out = forms.DateField(
-        label="Check-out",
-        widget=forms.DateInput(attrs={"type": "date"}),
-    )
-
-    def __init__(self, *args, houses=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        choices = []
-        if houses is not None:
-            choices = [
-                (str(house["id"]), f'{house["name"]} — ${house["price_per_night"]}/night')
-                for house in houses
-            ]
-        self.fields["house"].choices = choices
+class BookingForm(forms.ModelForm):
+    class Meta:
+        model = Booking
+        fields = ["house" , "check_in" , "check_out"]
+        labels = {"house" : "Apartment"}
+        widgets = {
+            "house" : forms.Select(attrs={"class" : "form_select"}),
+            "check_in" : forms.DateInput(attrs={"type" : "date" , "class" : "form-control"}),
+            "check_out" : forms.DateInput(attrs={"type" : "date" , "class" : "form-control"}),
+        }
 
     def clean(self):
-        cleaned_data = super().clean()
-        check_in = cleaned_data.get("check_in")
-        check_out = cleaned_data.get("check_out")
-        if check_in and check_out and check_out <= check_in:
-            self.add_error("check_out", "Check-out must be after check-in.")
-        return cleaned_data
-
-
-class ReviewForm(forms.Form):
-    rating = forms.ChoiceField(
-        choices=[(value, f"{value} star{'s' if value != 1 else ''}") for value in range(1, 6)],
-    )
-    comment = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}))
+        data = super().clean() 
+        house,cin,cout = data.get("house") , data.get("check_in") , data.get("check_out")
+        if house and cin and cout :
+            if cin < timezone.localdate():
+                raise forms.ValidationError("Check-in cant be in the past.") 
+            if cout <= cin:
+                raise forms.ValidationError("Check-out must be after the check-in") 
+            if not house.is_free(cin, cout):
+                raise forms.ValidationError("Sorry, that appartmetn is alreaty booked")
+        return data  
+        
+          
