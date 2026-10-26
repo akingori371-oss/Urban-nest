@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
@@ -25,4 +26,6 @@ urlpatterns = [
     path("bookings/pay/booking/<int:pk>/", views.pay_booking, name="pay_booking"),
     path("bookings/pay/period/<int:booking_pk>/<int:period_pk>/", views.pay_period, name="pay_period"),
     path("bookings/favorite/<int:pk>/", views.toggle_favorite, name="toggle_favorite"),
+
+
 ]
