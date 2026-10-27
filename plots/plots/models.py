@@ -131,3 +131,11 @@ class Favorite(models.Model):
 
     class Meta:
         unique_together = ("user", "house")
+
+class LoginEvent(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user} at {self.timestamp:%Y-%m-%d %H:%M}"        
+
