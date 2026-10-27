@@ -1,5 +1,5 @@
 
-from django.urls import path
+from django.urls import path,include
 from . import views
 
 urlpatterns = [
@@ -17,4 +17,5 @@ urlpatterns = [
 
     # Analytics
     path("analytics/", views.analytics, name="analytics"),
+    path("api/", include("plots.api_urls")),
 ]
