@@ -17,5 +17,5 @@ urlpatterns = [
 
     # Analytics
     path("analytics/", views.analytics, name="analytics"),
-    path("api/", include("plots.api_urls")),
+    path("api/", include("plots.api.urls")),
 ]
