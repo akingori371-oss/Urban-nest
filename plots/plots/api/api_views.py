@@ -142,3 +142,38 @@ def dashboard(request):
     ann = [{"title": a.title, "message": a.message, "created_at": a.created_at}
            for a in Announcement.objects.all()[:5]]
     return Response({"payments_due": due, "announcements": ann})
+
+
+import random
+import re
+
+@api_view(["POST"])
+def pay_mock(request, kind, pk):
+    """Demo payment: pretends to be M-Pesa. kind is 'booking' or 'period'."""
+    phone = re.sub(r"\D", "", request.data.get("phone", ""))
+    if phone.startswith("0"):
+        phone = "254" + phone[1:]
+    if not re.fullmatch(r"254\d{9}", phone):
+        return err("Send a phone number like 0712345678.")
+
+    if kind == "booking":
+        target = own_booking(request, pk)
+        if target.status != "confirmed" or target.is_long:
+            return err("This booking can't be paid this way.")
+        amount = target.total_price
+    else:
+        target = get_object_or_404(PaymentPeriod.objects.select_related("booking"),
+                                   pk=pk, booking__user=request.user)
+        if target.booking.status != "confirmed":
+            return err("Cancelled bookings can't be paid.")
+        amount = target.amount
+
+    if target.paid:
+        return err("Already paid.")
+
+    target.paid, target.paid_at = True, timezone.now()
+    target.save()
+    receipt = "MOCK" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", k=6))
+    return Response({"status": "success", "receipt": receipt,
+                     "phone": phone, "amount": str(amount),
+                     "message": f"KES {amount} received from {phone}"})

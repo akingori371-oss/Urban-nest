@@ -12,4 +12,5 @@ urlpatterns = [
     path("bookings/<int:pk>/periods/", v.booking_periods),
     path("periods/<int:pk>/pay/", v.period_pay),
     path("dashboard/", v.dashboard),
+    path("pay/<str:kind>/<int:pk>/", v.pay_mock),
 ]
