@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import views
 
@@ -13,9 +14,7 @@ urlpatterns = [
     path("analytics/", views.analytics, name="analytics"),
 
     # ---------- Auth ----------
-    path("login/",
-         auth_views.LoginView.as_view(template_name="accounts/login.html"),
-         name="login"),
+    path("auth/login/", TokenObtainPairView.as_view(), name="api_login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("signup/", views.signup, name="signup"),
 
