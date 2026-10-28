@@ -8,7 +8,7 @@ from django.utils.dateparse import parse_date
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny , IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import House, Booking, PaymentPeriod, Announcement
@@ -45,9 +45,14 @@ def login_view(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def me(request):
     u = request.user
-    return Response({"id": u.id, "username": u.username, "email": u.email})
+    return Response({
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+    })
 
 
 # ---------- Houses ----------
