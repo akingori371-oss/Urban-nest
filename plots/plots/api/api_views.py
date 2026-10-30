@@ -10,6 +10,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny , IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import House, Booking, PaymentPeriod, Announcement
 from .serializers import (RegisterSerializer, HouseSerializer,
@@ -182,3 +183,19 @@ def pay_mock(request, kind, pk):
     return Response({"status": "success", "receipt": receipt,
                      "phone": phone, "amount": str(amount),
                      "message": f"KES {amount} received from {phone}"})
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def login_view(request):
+    user = authenticate(username=request.data.get("username"),
+                       password=request.data.get("password"))
+    if user is None:
+        return err("Invalid username or password.", 401)
+    user_logged_in.send(sender=user.__class__, request=request, user=user)
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "username": user.username,
+        "is_superuser": user.is_superuser,
+    })
