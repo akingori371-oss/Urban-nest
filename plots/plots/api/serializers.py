@@ -8,11 +8,17 @@ User = get_user_model()
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = ["username", "email", "password"]
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return value.lower()
 
     def validate_password(self, value):
         validate_password(value)
@@ -20,7 +26,6 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, data):
         return User.objects.create_user(**data)
-
 
 class HouseSerializer(serializers.ModelSerializer):
     avg_rating = serializers.FloatField(read_only=True)
