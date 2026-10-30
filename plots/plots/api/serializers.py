@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 from ..models import House, Booking, PaymentPeriod
+from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 
