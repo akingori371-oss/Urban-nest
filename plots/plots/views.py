@@ -117,3 +117,48 @@ def signup(request):
         login(request, user)
         return redirect("dashboard")
     return render(request, "accounts/signup.html", {"form": form})
+
+from django.shortcuts import render, redirect
+
+def favorites(request):
+    return render(request, "bookings/favorites.html", {"houses": []})
+
+def review_booking(request, pk):
+    return redirect("my_bookings")
+
+def review_period(request, pk):
+    return redirect("my_bookings")
+
+def toggle_favorite(request, pk):
+    return redirect("houses")
+
+@login_required
+def dashboard(request):
+    due_count = PaymentPeriod.objects.filter(
+        booking__user=request.user, booking__status="confirmed", paid=False
+    ).count()
+    return render(request, "dashboard.html", {
+        "announcements": Announcement.objects.all()[:5],
+        "due_count": due_count,
+    })
+
+
+@login_required
+def my_bookings(request):
+    bookings = (Booking.objects.filter(user=request.user)
+                .select_related("house").order_by("-check_in"))
+    return render(request, "bookings/my_bookings.html", {"bookings": bookings})
+
+
+@login_required
+def booking_card(request, pk):
+    booking = get_object_or_404(Booking, pk=pk, user=request.user)
+    periods = booking.periods.all()
+    paid_total = periods.filter(paid=True).aggregate(s=Sum("amount"))["s"] or 0
+    total = periods.aggregate(s=Sum("amount"))["s"] or 0
+    return render(request, "bookings/booking_card.html", {
+        "booking": booking,
+        "periods": periods,
+        "paid_total": paid_total,
+        "outstanding": total - paid_total,
+    })

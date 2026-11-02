@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import views
 
@@ -10,26 +9,28 @@ urlpatterns = [
 
     # ---------- Pages ----------
     path("", views.landing, name="landing"),
-    # path("dashboard/", views.dashboard, name="dashboard"),
+    path("dashboard/", views.dashboard, name="dashboard"),
     path("analytics/", views.analytics, name="analytics"),
 
-    # ---------- Auth ----------
-    path("auth/login/", TokenObtainPairView.as_view(), name="api_login"),
+    # ---------- Auth (the names login, logout and signup are required by base.html) ----------
+    path("login/",
+         auth_views.LoginView.as_view(template_name="accounts/login.html"),
+         name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("signup/", views.signup, name="signup"),
 
     # ---------- Bookings ----------
-    # path("bookings/", views.house_list, name="houses"),
+    path("bookings/", views.house_list, name="houses"),
     path("book/", views.book, name="book"),
-    # path("mine/", views.my_bookings, name="my_bookings"),
-    # path("card/<int:pk>/", views.booking_card, name="booking_card"),
-    # path("favorites/", views.favorites, name="favorites"),
+    path("mine/", views.my_bookings, name="my_bookings"),
+    path("card/<int:pk>/", views.booking_card, name="booking_card"),
+    path("favorites/", views.favorites, name="favorites"),
 
-    # # ---------- Reviews ----------
-    # path("review/booking/<int:pk>/", views.review_booking, name="review_booking"),
-    # path("review/period/<int:pk>/", views.review_period, name="review_period"),
+    # ---------- Reviews ----------
+    path("review/booking/<int:pk>/", views.review_booking, name="review_booking"),
+    path("review/period/<int:pk>/", views.review_period, name="review_period"),
 
-    # ---------- Button actions (POST only) ----------
+    # ---------- Button actions ----------
     path("cancel-booking/<int:pk>/", views.cancel_booking, name="cancel_booking"),
     path("pay-booking/<int:pk>/", views.pay_booking, name="pay_booking"),
     path("pay-period/<int:pk>/", views.pay_period, name="pay_period"),
