@@ -162,3 +162,30 @@ def booking_card(request, pk):
         "paid_total": paid_total,
         "outstanding": total - paid_total,
     })
+
+@login_required
+def house_list(request):
+    check_in = parse_date(request.GET.get("check_in") or "")
+    check_out = parse_date(request.GET.get("check_out") or "")
+    searched = bool(check_in and check_out and check_out > check_in)
+
+    houses = House.objects.annotate(
+        avg_rating=Avg("reviews__rating"),
+        review_count=Count("reviews"),
+    )
+
+    if searched:
+        busy = Booking.objects.filter(
+            status="confirmed", check_in__lt=check_out, check_out__gt=check_in
+        ).values_list("house_id", flat=True)
+        houses = houses.exclude(id__in=busy)
+
+    favs = set(Favorite.objects.filter(user=request.user).values_list("house_id", flat=True))
+
+    return render(request, "bookings/houses.html", {
+        "houses": houses,
+        "favs": favs,
+        "searched": searched,
+        "check_in": request.GET.get("check_in", ""),
+        "check_out": request.GET.get("check_out", ""),
+    })
