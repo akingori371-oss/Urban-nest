@@ -129,9 +129,7 @@ MAILERS = {
     },
 }
 
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard"
-LOGOUT_REDIRECT_URL = "landing"
+
 
 
 from datetime import timedelta
