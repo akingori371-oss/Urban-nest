@@ -97,8 +97,7 @@ def house_list(request):
 def own_booking(request, pk):
     return get_object_or_404(Booking.objects.select_related("house"),
                              pk=pk, user=request.user)   # not yours = 404
- 
- 
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def booking_list(request):
@@ -131,8 +130,8 @@ def booking_cancel(request, pk):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def booking_periods(request, pk):
-    periods = own_booking(request, pk).periods.all()
-    return Response(PaymentPeriodSerializer(periods, many=True).data)
+ periods = own_booking(request, pk).periods.all()
+ return Response(PaymentPeriodSerializer(periods, many=True).data)
  
  
 # ---------- Payments (mock M-Pesa) ----------
