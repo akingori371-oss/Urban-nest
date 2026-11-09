@@ -139,3 +139,13 @@ class LoginEvent(models.Model):
     def __str__(self):
         return f"{self.user} at {self.timestamp:%Y-%m-%d %H:%M}"        
 
+from django.contrib.auth.signals import user_logged_in
+from django.dispatch import receiver
+
+
+@receiver(user_logged_in)
+def record_login(sender, request, user, **kwargs):
+    try:
+        LoginEvent.objects.create(user=user)
+    except Exception:
+        pass  # analytics must never block a login
