@@ -1,6 +1,11 @@
+
 import random
 import re
- 
+import base64
+import requests
+
+from datetime import datetime
+
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.db import transaction
@@ -8,15 +13,20 @@ from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
- 
-from ..models import House, Booking, PaymentPeriod, Announcement
-from .serializers import (RegisterSerializer, HouseSerializer,
-                          BookingSerializer, PaymentPeriodSerializer)
- 
+
+from ..models import (
+    House, Booking, PaymentPeriod, Announcement, MpesaPayment
+)
+
+from .serializers import (
+    RegisterSerializer, HouseSerializer,
+    BookingSerializer, PaymentPeriodSerializer
+)
  
 def err(msg, code=400):
     return Response({"detail": msg}, status=code)
@@ -208,3 +218,57 @@ def user_detail(request, pk):
         "bookings": BookingSerializer(bookings, many=True).data,
     })
  
+def mpesa_access_token():
+    url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+
+    response = requests.get(
+        url,
+        auth=(
+            settings.MPESA_CONSUMER_KEY,
+            settings.MPESA_CONSUMER_SECRET
+        ),
+        timeout=30
+    )
+
+    response.raise_for_status()
+
+    return response.json()["access_token"]
+
+def initiate_stk_push(phone, amount, reference):
+    shortcode = settings.MPESA_SHORTCODE
+    passkey = settings.MPESA_PASSKEY
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+    password = base64.b64encode(
+        f"{shortcode}{passkey}{timestamp}".encode()
+    ).decode()
+
+    token = mpesa_access_token()
+
+    url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+    payload = {
+        "BusinessShortCode": shortcode,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": amount,
+        "PartyA": phone,
+        "PartyB": shortcode,
+        "PhoneNumber": phone,
+        "CallBackURL": settings.MPESA_CALLBACK_URL,
+        "AccountReference": reference,
+        "TransactionDesc": "Urban Nest Payment"
+    }
+
+    response = requests.post(
+        url,
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30
+    )
+
+    response.raise_for_status()
+
+    return response.json()    
