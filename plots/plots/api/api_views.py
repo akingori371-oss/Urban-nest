@@ -238,6 +238,62 @@ def pay_mock(request, kind, pk):
         "checkout_request_id": payment.checkout_request_id
     })
 
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def mpesa_callback(request):
+    data = request.data
+
+    callback = data.get("Body", {}).get("stkCallback", {})
+
+    checkout_id = callback.get("CheckoutRequestID")
+    result_code = callback.get("ResultCode")
+
+    if not checkout_id:
+        return Response({"message": "Missing checkout request ID"}, status=400)
+
+    payment = MpesaPayment.objects.filter(
+        checkout_request_id=checkout_id
+    ).first()
+
+    if not payment:
+        return Response({"message": "Payment not found"}, status=404)
+
+    payment.result_code = result_code
+
+    if result_code == 0:
+        metadata = callback.get("CallbackMetadata", {}).get("Item", [])
+
+        receipt = next(
+            (
+                item.get("Value")
+                for item in metadata
+                if item.get("Name") == "MpesaReceiptNumber"
+            ),
+            ""
+        )
+
+        payment.status = "success"
+        payment.receipt = str(receipt)
+
+        if payment.booking:
+            payment.booking.paid = True
+            payment.booking.paid_at = timezone.now()
+            payment.booking.save()
+
+        elif payment.period:
+            payment.period.paid = True
+            payment.period.paid_at = timezone.now()
+            payment.period.save()
+
+    else:
+        payment.status = "failed"
+
+    payment.save()
+
+    return Response({"ResultCode": 0, "ResultDesc": "Accepted"})
+
+
 # ---------- Dashboard ----------
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
