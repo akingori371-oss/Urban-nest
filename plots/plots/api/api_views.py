@@ -5,7 +5,7 @@ import base64
 import requests
 
 from datetime import datetime
-
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.db import transaction
