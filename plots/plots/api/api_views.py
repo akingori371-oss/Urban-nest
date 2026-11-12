@@ -13,7 +13,7 @@ from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-
+from decimal import Decimal, ROUND_HALF_UP
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
@@ -147,39 +147,97 @@ def booking_periods(request, pk):
 # ---------- Payments (mock M-Pesa) ----------
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+
 def pay_mock(request, kind, pk):
-    """Demo payment: pretends to be M-Pesa. kind is 'booking' or 'period'."""
+    """Initiate an M-Pesa STK Push for a booking or payment period."""
+
+    # 1. Get and validate the phone number
     phone = re.sub(r"\D", "", request.data.get("phone", "") or "")
+
     if phone.startswith("0"):
         phone = "254" + phone[1:]
+
     if not re.fullmatch(r"254\d{9}", phone):
         return err("Send a phone number like 0712345678.")
- 
+
+    # 2. Find what the user wants to pay for
     if kind == "booking":
         target = own_booking(request, pk)
+
         if target.status != "confirmed" or target.is_long:
             return err("This booking can't be paid this way.")
+
+        if target.paid:
+            return err("Already paid.")
+
         amount = target.total_price
+        booking = target
+        period = None
+        reference = f"BOOKING-{target.pk}"
+
     elif kind == "period":
-        target = get_object_or_404(PaymentPeriod.objects.select_related("booking"),
-                                   pk=pk, booking__user=request.user)
+        target = get_object_or_404(
+            PaymentPeriod.objects.select_related("booking"),
+            pk=pk,
+            booking__user=request.user
+        )
+
         if target.booking.status != "confirmed":
             return err("Cancelled bookings can't be paid.")
+
+        if target.paid:
+            return err("Already paid.")
+
         amount = target.amount
+        booking = None
+        period = target
+        reference = f"PERIOD-{target.pk}"
+
     else:
         return err("Use 'booking' or 'period'.", 404)
- 
-    if target.paid:
-        return err("Already paid.")
- 
-    target.paid, target.paid_at = True, timezone.now()
-    target.save()
-    receipt = "MOCK" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", k=6))
-    return Response({"status": "success", "receipt": receipt,
-                     "phone": phone, "amount": str(amount),
-                     "message": f"KES {amount} received from {phone}"})
- 
- 
+
+    # 3. Convert the amount to whole Kenyan shillings
+    amount = int(Decimal(amount).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    ))
+
+    if amount <= 0:
+        return err("Invalid payment amount.")
+
+    # 4. Ask Safaricom to send an STK Push
+    try:
+        result = initiate_stk_push(phone, amount, reference)
+
+    except requests.RequestException:
+        return err("Could not connect to M-Pesa. Please try again.", 502)
+
+    # 5. Check whether Safaricom accepted our request
+    if result.get("ResponseCode") != "0":
+        return err(
+            result.get("ResponseDescription", "M-Pesa rejected the request."),
+            400
+        )
+
+    # 6. Save the payment request in our database
+    payment = MpesaPayment.objects.create(
+        booking=booking,
+        period=period,
+        checkout_request_id=result["CheckoutRequestID"],
+        merchant_request_id=result.get("MerchantRequestID", ""),
+        phone=phone,
+        amount=amount,
+        status="pending"
+    )
+
+    # 7. Tell the frontend that the payment prompt was sent
+    return Response({
+        "status": "pending",
+        "message": "M-Pesa payment prompt sent. Enter your PIN to complete payment.",
+        "phone": phone,
+        "amount": str(payment.amount),
+        "checkout_request_id": payment.checkout_request_id
+    })
+
 # ---------- Dashboard ----------
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
