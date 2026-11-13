@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorText } from "../api.js";
+import MpesaPay from "./MpesaPay.jsx";
 
 
 export default function BookingCard() {
@@ -10,19 +11,23 @@ export default function BookingCard() {
   const [error, setError] = useState("");
 
   async function load() {
-    const res = await api(`/bookings/${id}/periods/`);
-    const data = await res.json();
-    if (res.ok) setPeriods(data);
-    else setError(errorText(data));
+    try {
+      const res = await api(`/bookings/${id}/periods/`);
+      const data = await res.json();
+      if (res.ok) setPeriods(data);
+      else setError(errorText(data));
+    } catch {
+      setError("Could not refresh payment periods. Check your connection and try again.");
+    }
   }
 
   useEffect(() => {
     load();
   }, [id]);
 
-  function paid(data) {
+  function paid(period) {
     setError("");
-    setMessage(`Payment received. M-Pesa receipt: ${data.receipt}`);
+    setMessage(`Payment confirmed for period ${period.number}.`);
     load();
   }
 
@@ -50,7 +55,7 @@ export default function BookingCard() {
               <p className="success">Paid</p>
             ) : (
               <div className="row">
-                <MpesaPay kind="period" id={p.id} amount={p.amount} onPaid={paid} />
+                <MpesaPay periodId={p.id} bookingId={id} amount={p.amount} onPaid={paid} />
               </div>
             )}
           </div>
