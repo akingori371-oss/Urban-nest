@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorText } from "../Api.js";
-import MpesaPay from "../components/MpesaPay.jsx";
+
 
 export default function BookingCard() {
   const { id } = useParams();
