@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+﻿import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
@@ -20,7 +20,7 @@ export default function App() {
     <>
       <nav className="nav">
         <div>
-          <Link to="/dashboard" className="brand">BookIt</Link>
+          <Link to="/dashboard" className="brand">Urban Nest</Link>
           {username && <Link to="/dashboard">Dashboard</Link>}
           {username && <Link to="/houses">Houses</Link>}
           {username && <Link to="/bookings">My bookings</Link>}
