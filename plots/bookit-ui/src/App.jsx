@@ -5,6 +5,7 @@ import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Houses from "./pages/Houses.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
+import Landing from "./pages/Landing.jsx";
 import BookingCard from "./pages/BookingCard.jsx";
 
 function Protected({ children }) {
@@ -42,7 +43,7 @@ export default function App() {
 
       <main className="container">
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
