@@ -1,6 +1,6 @@
 from datetime import timedelta
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 
@@ -55,15 +55,24 @@ class Booking(models.Model):
                 and self.check_out <= timezone.localdate() and not self.has_review)
 
     def create_periods(self):
-        """Split a long stay into 30-day payment periods."""
+        """Create 30-day payment periods idempotently for long stays."""
+        if not self.is_long:
+            return
         start, number = self.check_in, 1
-        while start < self.check_out:
-            end = min(start + timedelta(days=30), self.check_out)
-            PaymentPeriod.objects.create(
-                booking=self, number=number, start=start, end=end,
-                amount=(end - start).days * self.house.price_per_night,
-            )
-            start, number = end, number + 1
+        with transaction.atomic():
+            booking = Booking.objects.select_for_update().get(pk=self.pk)
+            while start < booking.check_out:
+                end = min(start + timedelta(days=30), booking.check_out)
+                PaymentPeriod.objects.get_or_create(
+                    booking=booking,
+                    number=number,
+                    defaults={
+                        "start": start,
+                        "end": end,
+                        "amount": (end - start).days * booking.house.price_per_night,
+                    },
+                )
+                start, number = end, number + 1
 
     def __str__(self):
         return f"{self.user} - {self.house} ({self.check_in} to {self.check_out})"
@@ -80,6 +89,9 @@ class PaymentPeriod(models.Model):
 
     class Meta:
         ordering = ["number"]
+        constraints = [
+            models.UniqueConstraint(fields=["booking", "number"], name="unique_booking_period_number"),
+        ]
 
     @property
     def has_review(self):
@@ -176,7 +188,9 @@ class MpesaPayment(models.Model):
 
     checkout_request_id = models.CharField(
         max_length=100,
-        unique=True
+        unique=True,
+        null=True,
+        blank=True,
     )
 
     merchant_request_id = models.CharField(
@@ -197,6 +211,15 @@ class MpesaPayment(models.Model):
     result_code = models.IntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(booking__isnull=False, period__isnull=True)
+                           | models.Q(booking__isnull=True, period__isnull=False)),
+                name="mpesa_payment_exactly_one_target",
+            ),
+        ]
 
     def __str__(self):
         return f"M-Pesa {self.checkout_request_id} - {self.status}"    
