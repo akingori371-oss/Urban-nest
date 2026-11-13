@@ -168,6 +168,7 @@ class MpesaPayment(models.Model):
         ("pending", "Pending"),
         ("success", "Success"),
         ("failed", "Failed"),
+        ("review", "Needs review"),
     ]
 
     booking = models.ForeignKey(
@@ -208,6 +209,7 @@ class MpesaPayment(models.Model):
     )
 
     receipt = models.CharField(max_length=50, blank=True)
+    result_description = models.CharField(max_length=255, blank=True)
     result_code = models.IntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -222,4 +224,12 @@ class MpesaPayment(models.Model):
         ]
 
     def __str__(self):
-        return f"M-Pesa {self.checkout_request_id} - {self.status}"    
+        return f"M-Pesa {self.checkout_request_id} - {self.status}"
+
+
+class MpesaCallbackEvent(models.Model):
+    """Keep callbacks that race the STK response for later reconciliation."""
+    checkout_request_id = models.CharField(max_length=100, unique=True)
+    payload = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)

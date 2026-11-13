@@ -20,6 +20,7 @@ urlpatterns = [
 
     # Payments
     path("pay/<str:kind>/<int:pk>/", v.pay_mock),
+    path("payments/<int:pk>/", v.payment_status),
     path("mpesa/callback/", v.mpesa_callback),
 
     # Dashboard
