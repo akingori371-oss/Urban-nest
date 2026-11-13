@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, errorText } from "../Api.js";
+import { api, errorText } from "../api.js";
 
 
 export default function BookingCard() {

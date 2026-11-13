@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, errorText } from "../Api.js";
+import { api, errorText } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 
 export default function Dashboard() {
