@@ -66,3 +66,29 @@ class UrbanNestAPITests(TestCase):
         self.assertEqual(result.data["receipt"], "QAB123XYZ")
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.get(f"/api/payments/{payment.pk}/").status_code, 404)
+
+    def test_house_listing_is_paginated_and_details_are_dynamic(self):
+        for index in range(24):
+            House.objects.create(name=f"Flat {index:02d}", location="Nairobi",
+                                 bedrooms=2, price_per_night="1500.00")
+        first = self.client.get("/api/houses/?page=1")
+        second = self.client.get("/api/houses/?page=2")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data["count"], 25)
+        self.assertEqual(len(first.data["results"]), 20)
+        self.assertIsNotNone(first.data["next"])
+        self.assertIsNone(first.data["previous"])
+        self.assertEqual(len(second.data["results"]), 5)
+        self.assertIsNotNone(second.data["previous"])
+        single = self.client.get("/api/houses/?search=Nest")
+        self.assertEqual(single.data["count"], 1)
+        detail = self.client.get(f"/api/houses/{self.house.pk}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["name"], "Nest")
+        self.assertIn("availability", detail.data)
+        self.assertEqual(self.client.get("/api/houses/999999/").status_code, 404)
+
+    def test_house_listing_rejects_invalid_page_and_requires_authentication(self):
+        self.assertEqual(self.client.get("/api/houses/?page=abc").status_code, 404)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get("/api/houses/").status_code, 401)
