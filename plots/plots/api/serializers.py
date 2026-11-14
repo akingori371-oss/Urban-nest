@@ -107,6 +107,16 @@ class ManagerHouseSerializer(serializers.ModelSerializer):
         model = House
         fields = ["id", "name", "location", "description", "bedrooms", "price_per_night", "is_active"]
 
+    def validate_bedrooms(self, value):
+        if value < 1:
+            raise serializers.ValidationError("An apartment must have at least one bedroom.")
+        return value
+
+    def validate_price_per_night(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Nightly price must be greater than zero.")
+        return value
+
 
 class HousePhotoSerializer(serializers.ModelSerializer):
     class Meta:

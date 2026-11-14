@@ -5,6 +5,7 @@ import re
 import hashlib
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -139,8 +140,8 @@ class ManagerAPITests(TestCase):
         response = self.client.post("/api/manager/invitations/", {"email": "newmanager@example.test"}, format="json")
         self.assertEqual(response.status_code, 201)
         invitation = ManagerInvitation.objects.get(pk=response.data["id"])
-        self.assertEqual(len(mail.outbox), 1)
-        token = re.search(r"/manager/invitations/accept/([^\s]+)", mail.outbox[0].body).group(1)
+        self.assertEqual(len(mail.outbox), 2)
+        token = re.search(r"/manager/invitations/accept/([^\s]+)", mail.outbox[1].body).group(1)
         self.assertEqual(invitation.token_hash, hashlib.sha256(token.encode()).hexdigest())
         invitee = get_user_model().objects.create_user(username="invitee", email="newmanager@example.test", password="StrongPass123!")
         self.auth(invitee)
@@ -171,12 +172,16 @@ class ManagerAPITests(TestCase):
 
     def test_manager_can_create_edit_and_safely_deactivate_apartment(self):
         self.auth(self.manager)
+        invalid = self.client.post("/api/manager/apartments/", {"name": "Bad Flat", "location": "Nairobi", "bedrooms": 0, "price_per_night": "950"}, format="json")
+        self.assertEqual(invalid.status_code, 400)
         created = self.client.post("/api/manager/apartments/", {"name": "New Flat", "location": "Nairobi", "bedrooms": 2, "price_per_night": "950"}, format="json")
         self.assertEqual(created.status_code, 201)
         pk = created.data["id"]
         self.assertEqual(self.client.patch(f"/api/manager/apartments/{pk}/", {"price_per_night": "1050"}, format="json").status_code, 200)
         self.assertEqual(self.client.delete(f"/api/manager/apartments/{pk}/").status_code, 200)
         self.assertFalse(House.objects.get(pk=pk).is_active)
+        bad_photo = SimpleUploadedFile("fake.png", b"not an image", content_type="image/png")
+        self.assertEqual(self.client.post(f"/api/manager/apartments/{self.house.pk}/photos/", {"image": bad_photo}, format="multipart").status_code, 400)
         self.auth(self.tenant)
         self.assertEqual(self.client.post("/api/manager/apartments/", {}, format="json").status_code, 403)
 
@@ -227,6 +232,9 @@ class ManagerAPITests(TestCase):
         self.assertEqual(dashboard["tenants_total"], 2)
         self.assertEqual(dashboard["bookings_total"], 1)
         self.assertEqual(dashboard["outstanding_balance"], "2400")
+        tenants = self.client.get("/api/manager/tenants/").data["results"]
+        tenant_row = next(row for row in tenants if row["id"] == self.tenant.pk)
+        self.assertEqual(tenant_row["outstanding_balance"], "2400")
 
     def test_manager_can_publish_announcement_to_selected_tenant(self):
         self.auth(self.manager)

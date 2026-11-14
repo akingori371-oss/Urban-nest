@@ -5,10 +5,9 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import F, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -184,7 +183,7 @@ def manager_bookings(request):
     for item, booking in zip(results, page):
         item["tenant"] = {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email}
         item["apartment"] = {"id": booking.house_id, "name": booking.house.name}
-        item["payment_status"] = "paid" if (booking.paid if not booking.is_long else not booking.periods.filter(paid=False).exists()) else "outstanding"
+        item["payment_status"] = "paid" if (booking.paid if not booking.is_long else all(period.paid for period in booking.periods.all())) else "outstanding"
     return paginator.get_paginated_response(results)
 
 
@@ -271,13 +270,26 @@ def manager_tenants(request):
         queryset = queryset.filter(is_active=request.query_params["active"] == "true")
     paginator = ManagerPagination()
     page = paginator.paginate_queryset(queryset, request)
+    user_ids = [user.pk for user in page]
+    booking_totals = {
+        row["user_id"]: row
+        for row in Booking.objects.filter(user_id__in=user_ids).values("user_id").annotate(
+            total=Count("id"),
+            short_due=Sum("total_price", filter=Q(status="confirmed", paid=False,
+                check_out__lte=F("check_in") + timedelta(days=30))),
+        )
+    }
+    period_totals = {
+        row["booking__user_id"]: row["total"]
+        for row in PaymentPeriod.objects.filter(booking__user_id__in=user_ids,
+            booking__status="confirmed", paid=False).values("booking__user_id").annotate(total=Sum("amount"))
+    }
     results = []
     for user in page:
-        bookings = Booking.objects.filter(user=user)
-        short_due = bookings.filter(status="confirmed", paid=False,
-            check_out__lte=F("check_in") + timedelta(days=30)).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
-        period_due = PaymentPeriod.objects.filter(booking__user=user, booking__status="confirmed", paid=False).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-        results.append({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active, "bookings_count": bookings.count(), "outstanding_balance": str(short_due + period_due)})
+        booking_summary = booking_totals.get(user.pk, {})
+        short_due = booking_summary.get("short_due") or Decimal("0")
+        period_due = period_totals.get(user.pk) or Decimal("0")
+        results.append({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active, "bookings_count": booking_summary.get("total", 0), "outstanding_balance": str(short_due + period_due)})
     return paginator.get_paginated_response(results)
 
 
@@ -301,7 +313,7 @@ def _token_hash(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def _send_invitation(invitation, token, request):
+def _send_invitation(invitation, token):
     base = getattr(settings, "URBAN_NEST_FRONTEND_URL", "http://localhost:5173").rstrip("/")
     link = f"{base}/manager/invitations/accept/{token}"
     send_mail("Urban Nest manager invitation", f"Accept your manager invitation: {link}\nThis invitation expires in 7 days.", settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False)
@@ -324,7 +336,7 @@ def manager_invitations(request):
         token = secrets.token_urlsafe(48)
         invitation = ManagerInvitation.objects.create(email=email, token_hash=_token_hash(token), invited_by=request.user, expires_at=timezone.now() + timedelta(days=7))
         try:
-            _send_invitation(invitation, token, request)
+            _send_invitation(invitation, token)
         except Exception:
             invitation.delete()
             return Response({"detail": "Invitation email could not be sent."}, status=503)
