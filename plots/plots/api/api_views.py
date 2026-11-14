@@ -70,11 +70,14 @@ def login_view(request):
  
     user_logged_in.send(sender=user.__class__, request=request, user=user)  # records a LoginEvent
     refresh = RefreshToken.for_user(user)
+    profile = getattr(user, "manager_profile", None)
     return Response({
         "access": str(refresh.access_token),
         "refresh": str(refresh),
         "username": user.username,
         "is_superuser": user.is_superuser,
+        "is_manager": bool(user.is_superuser or profile),
+        "is_main_manager": bool(user.is_superuser or (profile and profile.is_main)),
     })
  
  
@@ -82,7 +85,10 @@ def login_view(request):
 @permission_classes([IsAuthenticated])
 def me(request):
     u = request.user
-    return Response({"id": u.id, "username": u.username, "email": u.email})
+    profile = getattr(u, "manager_profile", None)
+    return Response({"id": u.id, "username": u.username, "email": u.email,
+                     "is_manager": bool(u.is_superuser or profile),
+                     "is_main_manager": bool(u.is_superuser or (profile and profile.is_main))})
  
  
 # ---------- Houses ----------
@@ -112,7 +118,7 @@ def house_list(request):
     cin, cout, date_error = validate_house_dates(request)
     if date_error:
         return date_error
-    qs = House.objects.annotate(avg_rating=Avg("reviews__rating"),
+    qs = House.objects.filter(is_active=True).prefetch_related("photos").annotate(avg_rating=Avg("reviews__rating"),
                                 review_count=Count("reviews"))
     if cin and cout:
         busy = Booking.objects.filter(status="confirmed", check_in__lt=cout,
@@ -129,7 +135,7 @@ def house_list(request):
     qs = qs.order_by(ordering)
     paginator = HousePagination()
     page = paginator.paginate_queryset(qs, request)
-    return paginator.get_paginated_response(HouseSerializer(page, many=True).data)
+    return paginator.get_paginated_response(HouseSerializer(page, many=True, context={"request": request}).data)
 
 
 @api_view(["GET"])
@@ -138,7 +144,7 @@ def house_detail(request, pk):
     cin, cout, date_error = validate_house_dates(request)
     if date_error:
         return date_error
-    house = get_object_or_404(House.objects.annotate(
+    house = get_object_or_404(House.objects.filter(is_active=True).prefetch_related("photos").annotate(
         avg_rating=Avg("reviews__rating"), review_count=Count("reviews")
     ).prefetch_related("reviews"), pk=pk)
     return Response(HouseDetailSerializer(house, context={"request": request}).data)
@@ -309,7 +315,7 @@ def dashboard(request):
     due_now = unpaid.filter(start=today).count()
     future = unpaid.filter(start__gt=today).count()
     ann = [{"title": a.title, "message": a.message, "created_at": a.created_at}
-           for a in Announcement.objects.all()[:5]]
+           for a in Announcement.objects.filter(is_published=True).filter(Q(recipients__isnull=True) | Q(recipients=request.user)).distinct()[:5]]
     return Response({"payments_due": overdue + due_now, "payments_overdue": overdue,
                      "payments_due_now": due_now, "payments_future": future,
                      "announcements": ann})
