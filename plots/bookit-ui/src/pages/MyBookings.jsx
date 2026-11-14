@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorText } from "../api.js";
+import MpesaPay from "./MpesaPay.jsx";
 
 export default function MyBookings() {
   const [bookings, setBookings] = useState([]);
-  const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [receipts, setReceipts] = useState({});
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const res = await api("/bookings/");
-    const data = await res.json();
-    if (res.ok) setBookings(data);
-    else setError(errorText(data));
+    try {
+      const res = await api("/bookings/");
+      const data = await res.json();
+      if (res.ok) {
+        setBookings(data);
+        setError("");
+      } else {
+        setError(errorText(data));
+      }
+    } catch {
+      setError("Could not load bookings. Check your connection and try again.");
+    }
   }, []);
 
   useEffect(() => {
@@ -20,61 +29,47 @@ export default function MyBookings() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  // One helper for the Cancel and Pay buttons.
-  async function act(path, body) {
+  async function act(path) {
     setMessage("");
     setError("");
-    const res = await api(path, { method: "POST", body: JSON.stringify(body || {}) });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(errorText(data));
-      return;
+    try {
+      const res = await api(path, { method: "POST", body: JSON.stringify({}) });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(errorText(data));
+        return;
+      }
+      setMessage(data.message || "Done.");
+      await load();
+    } catch {
+      setError("The request failed. Check your connection and try again.");
     }
-    setMessage(data.message || "Done.");
-    load();
-  }
-
-  function pay(id) {
-    if (!phone) {
-      setError("Enter your M-Pesa phone number first, for example 0712345678.");
-      return;
-    }
-    act(`/pay/booking/${id}/`, { phone });
   }
 
   return (
     <div>
       <h2>My bookings</h2>
-
-      <div className="row">
-        <label>
-          M-Pesa phone number
-          <input placeholder="0712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </label>
-      </div>
-
       {message && <p className="success">{message}</p>}
-      {error && <p className="error">{error}</p>}
-
+      {error && <p className="error" role="alert">{error}</p>}
       <div className="grid">
-        {bookings.map((b) => (
-          <div className="card" key={b.id}>
-            <h3>{b.house_name}</h3>
-            <p>{b.check_in} to {b.check_out} · {b.nights} night{b.nights === 1 ? "" : "s"}</p>
-            <p><strong>${b.total_price}</strong> · {b.is_long ? "Long stay" : "Short stay"}</p>
+        {bookings.map((booking) => (
+          <div className="card" key={booking.id}>
+            <h3>{booking.house_name}</h3>
+            <p>{booking.check_in} to {booking.check_out} · {booking.nights} night{booking.nights === 1 ? "" : "s"}</p>
+            <p><strong>KES {booking.total_price}</strong> · {booking.is_long ? "Long stay" : "Short stay"}</p>
             <p>
-              Status: <strong>{b.status}</strong>
-              {b.status === "confirmed" && !b.is_long && (b.paid ? " · Paid" : " · Unpaid")}
+              Status: <strong>{booking.status}</strong>
+              {booking.status === "confirmed" && !booking.is_long && (booking.paid ? " · Paid" : " · Unpaid")}
             </p>
-
-            {b.status === "confirmed" && (
+            {receipts[booking.id] && <p className="success">M-Pesa receipt: <strong>{receipts[booking.id]}</strong></p>}
+            {booking.status === "confirmed" && (
               <div className="row">
-                {b.is_long ? (
-                  <Link to={`/bookings/${b.id}`}>View payment card</Link>
+                {booking.is_long ? (
+                  <Link to={"/bookings/" + booking.id}>View payment card</Link>
                 ) : (
-                  !b.paid && <button onClick={() => pay(b.id)}>Pay</button>
+                  !booking.paid && <MpesaPay bookingId={booking.id} amount={booking.total_price} onPaid={(payment) => { setReceipts((current) => ({ ...current, [booking.id]: payment.receipt })); void load(); }} />
                 )}
-                <button onClick={() => act(`/bookings/${b.id}/cancel/`)}>Cancel</button>
+                <button onClick={() => act("/bookings/" + booking.id + "/cancel/")}>Cancel</button>
               </div>
             )}
           </div>
@@ -84,3 +79,4 @@ export default function MyBookings() {
     </div>
   );
 }
+

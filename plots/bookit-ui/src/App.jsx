@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+﻿import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./auth.js";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
@@ -55,3 +55,4 @@ export default function App() {
     </>
   );
 }
+

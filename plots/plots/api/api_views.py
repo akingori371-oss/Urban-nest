@@ -212,12 +212,12 @@ def process_mpesa_callback(data):
             MpesaCallbackEvent.objects.get_or_create(checkout_request_id=checkout_id, defaults={"payload": data})
             return Response({"ResultCode": 0, "ResultDesc": "Queued for reconciliation"}, status=202)
         merchant_id = callback.get("MerchantRequestID")
-        if merchant_id and payment.merchant_request_id and merchant_id != payment.merchant_request_id:
+        if payment.merchant_request_id and merchant_id != payment.merchant_request_id:
             return Response({"message": "Merchant request ID mismatch"}, status=400)
         try: code = int(callback.get("ResultCode"))
         except (ValueError, TypeError): return Response({"message": "Invalid result code"}, status=400)
         event = MpesaCallbackEvent.objects.filter(checkout_request_id=checkout_id).first()
-        if payment.status == "success":
+        if payment.status in {"success", "failed", "review"}:
             if event: event.processed_at = timezone.now(); event.save(update_fields=["processed_at"])
             return Response({"ResultCode": 0, "ResultDesc": "Already processed"})
         payment.result_code = code

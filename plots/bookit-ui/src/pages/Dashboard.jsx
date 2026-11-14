@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorText } from "../api.js";
 import { useAuth } from "../auth.js";
@@ -48,7 +48,7 @@ export default function Dashboard() {
       </div>
 
       <p>
-        <Link to="/houses">Find a house</Link> · <Link to="/bookings">My bookings</Link>
+        <Link to="/houses">Find a house</Link> Â· <Link to="/bookings">My bookings</Link>
       </p>
     </div>
   );

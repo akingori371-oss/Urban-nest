@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api.js";
 
 export default function Houses() {
@@ -62,9 +62,9 @@ export default function Houses() {
         {houses.map((h) => (
           <div className="card" key={h.id}>
             <h3>{h.name}</h3>
-            <p>{h.location} · {h.bedrooms} bedroom{h.bedrooms === 1 ? "" : "s"}</p>
+            <p>{h.location} Â· {h.bedrooms} bedroom{h.bedrooms === 1 ? "" : "s"}</p>
             <p>
-              {h.avg_rating ? `★ ${h.avg_rating.toFixed(1)} (${h.review_count})` : "No reviews yet"}
+              {h.avg_rating ? `â˜… ${h.avg_rating.toFixed(1)} (${h.review_count})` : "No reviews yet"}
             </p>
             <p><strong>${h.price_per_night}</strong> / night</p>
             <button onClick={() => book(h.id)}>Book</button>

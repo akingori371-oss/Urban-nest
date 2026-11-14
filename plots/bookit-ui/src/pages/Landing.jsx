@@ -1,13 +1,13 @@
-import { Link, Navigate } from "react-router-dom";
+﻿import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../auth.js";
 
 const features = [
-  { icon: "📅", title: "Search by date", text: "Pick your check-in and check-out dates and see only the houses that are free. No more guessing or phoning around." },
-  { icon: "💰", title: "Clear prices", text: "The total is worked out for you from the nightly price and the number of nights, so there are no surprises." },
-  { icon: "📲", title: "Pay with M-Pesa", text: "Pay straight from your phone with an M-Pesa prompt, and get a receipt as soon as the payment is confirmed." },
-  { icon: "🗓️", title: "Staying longer? Pay monthly", text: "Stays over 30 nights get a payment card split into 30-day periods, so you pay month by month instead of all at once." },
-  { icon: "🔒", title: "Your bookings stay yours", text: "Every booking is tied to your account. Only you can see, pay for or cancel your own bookings." },
-  { icon: "📢", title: "Updates from the owner", text: "Important notices appear on your dashboard when you log in, so you never miss news about your stay." },
+  { icon: "ðŸ“…", title: "Search by date", text: "Pick your check-in and check-out dates and see only the houses that are free. No more guessing or phoning around." },
+  { icon: "ðŸ’°", title: "Clear prices", text: "The total is worked out for you from the nightly price and the number of nights, so there are no surprises." },
+  { icon: "ðŸ“²", title: "Pay with M-Pesa", text: "Pay straight from your phone with an M-Pesa prompt, and get a receipt as soon as the payment is confirmed." },
+  { icon: "ðŸ—“ï¸", title: "Staying longer? Pay monthly", text: "Stays over 30 nights get a payment card split into 30-day periods, so you pay month by month instead of all at once." },
+  { icon: "ðŸ”’", title: "Your bookings stay yours", text: "Every booking is tied to your account. Only you can see, pay for or cancel your own bookings." },
+  { icon: "ðŸ“¢", title: "Updates from the owner", text: "Important notices appear on your dashboard when you log in, so you never miss news about your stay." },
 ];
 
 const steps = [
@@ -92,7 +92,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <p className="my-10 text-center text-sm text-slate-500">© BookIt · Built with Django and React</p>
+      <p className="my-10 text-center text-sm text-slate-500">Â© BookIt Â· Built with Django and React</p>
     </div>
   );
 }

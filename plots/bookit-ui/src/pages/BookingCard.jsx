@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorText } from "../api.js";
 import MpesaPay from "./MpesaPay.jsx";
@@ -8,6 +8,7 @@ export default function BookingCard() {
   const { id } = useParams();
   const [periods, setPeriods] = useState([]);
   const [message, setMessage] = useState("");
+  const [receipts, setReceipts] = useState({});
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -26,10 +27,11 @@ export default function BookingCard() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  function paid(period) {
+  function paid(payment) {
     setError("");
-    setMessage(`Payment confirmed for period ${period.number}.`);
-    load();
+    setMessage("Payment confirmed.");
+    if (payment.receipt) setReceipts((current) => ({ ...current, [payment.period]: payment.receipt }));
+    void load();
   }
 
   const total = periods.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -37,10 +39,10 @@ export default function BookingCard() {
 
   return (
     <div>
-      <p><Link to="/bookings">← Back to my bookings</Link></p>
+      <p><Link to="/bookings">â† Back to my bookings</Link></p>
       <h2>Payment card</h2>
       <p>
-        Total KES {total.toFixed(2)} · Paid KES {paidTotal.toFixed(2)} · Outstanding KES {(total - paidTotal).toFixed(2)}
+        Total KES {total.toFixed(2)} Â· Paid KES {paidTotal.toFixed(2)} Â· Outstanding KES {(total - paidTotal).toFixed(2)}
       </p>
 
       {message && <p className="success">{message}</p>}
@@ -53,7 +55,7 @@ export default function BookingCard() {
             <p>{p.start} to {p.end}</p>
             <p><strong>KES {p.amount}</strong></p>
             {p.paid ? (
-              <p className="success">Paid</p>
+              <div><p className="success">Paid</p>{receipts[p.id] && <p>M-Pesa receipt: <strong>{receipts[p.id]}</strong></p>}</div>
             ) : (
               <div className="row">
                 <MpesaPay periodId={p.id} bookingId={id} amount={p.amount} onPaid={paid} />
@@ -66,3 +68,4 @@ export default function BookingCard() {
     </div>
   );
 }
+
