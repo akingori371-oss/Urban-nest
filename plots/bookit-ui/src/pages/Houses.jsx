@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "../api.js";
 
 export default function Houses() {
@@ -8,7 +8,7 @@ export default function Houses() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     setError("");
     const query = checkIn && checkOut ? `?check_in=${checkIn}&check_out=${checkOut}` : "";
     const res = await api("/houses/" + query);
@@ -19,11 +19,12 @@ export default function Houses() {
       return;
     }
     setHouses(data);
-  }
+  }, [checkIn, checkOut]);
 
   useEffect(() => {
-    load();
-  }, []);
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   async function book(houseId) {
     setMessage("");

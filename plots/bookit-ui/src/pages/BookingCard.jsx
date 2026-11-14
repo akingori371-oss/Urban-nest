@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, errorText } from "../api.js";
 import MpesaPay from "./MpesaPay.jsx";
@@ -10,7 +10,7 @@ export default function BookingCard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const res = await api(`/bookings/${id}/periods/`);
       const data = await res.json();
@@ -19,11 +19,12 @@ export default function BookingCard() {
     } catch {
       setError("Could not refresh payment periods. Check your connection and try again.");
     }
-  }
+  }, [id]);
 
   useEffect(() => {
-    load();
-  }, [id]);
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   function paid(period) {
     setError("");

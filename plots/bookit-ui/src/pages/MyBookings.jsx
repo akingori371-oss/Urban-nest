@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorText } from "../api.js";
 
@@ -8,16 +8,17 @@ export default function MyBookings() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await api("/bookings/");
     const data = await res.json();
     if (res.ok) setBookings(data);
     else setError(errorText(data));
-  }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   // One helper for the Cancel and Pay buttons.
   async function act(path, body) {

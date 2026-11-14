@@ -1,20 +1,68 @@
+﻿from datetime import timedelta
+from unittest.mock import patch
+from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.urls import reverse
+from django.utils import timezone
+from rest_framework.test import APIClient
+from .models import Booking, House, MpesaPayment
 
-from .forms import BookingForm
+class UrbanNestAPITests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(username="guest", email="guest@example.test", password="StrongPass123!")
+        self.other = User.objects.create_user(username="other", email="other@example.test", password="StrongPass123!")
+        self.house = House.objects.create(name="Nest", location="Nairobi", bedrooms=1, price_per_night="1000.00")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.start = timezone.localdate() + timedelta(days=10)
 
+    def booking(self, start=None, end=None):
+        start = start or self.start
+        end = end or start + timedelta(days=2)
+        return self.client.post("/api/bookings/", {"house": self.house.pk, "check_in": str(start), "check_out": str(end)}, format="json")
 
-class BookingAvailabilityTests(TestCase):
-    def test_house_list_filters_unavailable_dates(self):
-        response = self.client.get(
-            reverse("houses"),
-            {"check_in": "2026-10-02", "check_out": "2026-10-04"},
-        )
+    def test_overlap_and_back_to_back(self):
+        self.assertEqual(self.booking().status_code, 201)
+        self.assertEqual(self.booking(self.start + timedelta(days=1), self.start + timedelta(days=3)).status_code, 400)
+        self.assertEqual(self.booking(self.start + timedelta(days=2), self.start + timedelta(days=4)).status_code, 201)
 
-        self.assertEqual(response.status_code, 200)
-        house_ids = [house["id"] for house in response.context["houses"]]
-        self.assertEqual(house_ids, [3])
+    def test_rejects_past_and_invalid_dates(self):
+        past = timezone.localdate() - timedelta(days=1)
+        self.assertEqual(self.booking(past, past + timedelta(days=1)).status_code, 400)
+        self.assertEqual(self.booking(self.start, self.start).status_code, 400)
 
-    def test_booking_form_allows_optional_houses_argument(self):
-        form = BookingForm()
-        self.assertEqual(form.fields["house"].choices, [])
+    def test_long_periods_created_once(self):
+        response = self.booking(self.start, self.start + timedelta(days=65))
+        booking = Booking.objects.get(pk=response.data["id"])
+        booking.create_periods()
+        self.assertEqual(list(booking.periods.values_list("number", flat=True)), [1, 2, 3])
+
+    def test_booking_ownership(self):
+        pk = self.booking().data["id"]
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.post(f"/api/bookings/{pk}/cancel/").status_code, 404)
+
+    @patch("plots.api.api_views.initiate_stk_push")
+    def test_pending_payment_reused(self, initiate):
+        pk = self.booking().data["id"]
+        initiate.return_value = {"ResponseCode": "0", "CheckoutRequestID": "checkout-1"}
+        url = f"/api/pay/booking/{pk}/"
+        first = self.client.post(url, {"phone": "0712345678"}, format="json")
+        second = self.client.post(url, {"phone": "0712345678"}, format="json")
+        self.assertEqual(first.data["id"], second.data["id"])
+        initiate.assert_called_once()
+
+    @patch("plots.api.api_views.initiate_stk_push")
+    def test_callback_receipt_and_ownership(self, initiate):
+        pk = self.booking().data["id"]
+        initiate.return_value = {"ResponseCode": "0", "CheckoutRequestID": "checkout-2"}
+        started = self.client.post(f"/api/pay/booking/{pk}/", {"phone": "0712345678"}, format="json")
+        payment = MpesaPayment.objects.get(pk=started.data["id"])
+        callback = {"Body": {"stkCallback": {"CheckoutRequestID": "checkout-2", "ResultCode": 0, "CallbackMetadata": {"Item": [{"Name": "Amount", "Value": int(payment.amount)}, {"Name": "PhoneNumber", "Value": 254712345678}, {"Name": "MpesaReceiptNumber", "Value": "QAB123XYZ"}]}}}}
+        self.client.post("/api/mpesa/callback/", callback, format="json")
+        self.client.post("/api/mpesa/callback/", callback, format="json")
+        result = self.client.get(f"/api/payments/{payment.pk}/")
+        self.assertEqual(result.data["status"], "success")
+        self.assertEqual(result.data["receipt"], "QAB123XYZ")
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.get(f"/api/payments/{payment.pk}/").status_code, 404)
