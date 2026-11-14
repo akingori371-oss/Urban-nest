@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 
-from ..models import Booking, House, PaymentPeriod, Review
+from ..models import Booking, House, HousePhoto, PaymentPeriod, Review, Announcement
 
 User = get_user_model()
 
@@ -92,3 +92,25 @@ class PaymentPeriodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentPeriod
         fields = ["id", "number", "start", "end", "amount", "paid"]
+
+
+class ManagerHouseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = House
+        fields = ["id", "name", "location", "description", "bedrooms", "price_per_night", "is_active"]
+
+
+class HousePhotoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HousePhoto
+        fields = ["id", "image", "caption", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class ManagerAnnouncementSerializer(serializers.ModelSerializer):
+    recipient_ids = serializers.PrimaryKeyRelatedField(source="recipients", many=True, queryset=User.objects.all(), required=False)
+
+    class Meta:
+        model = Announcement
+        fields = ["id", "title", "message", "created_at", "is_published", "recipient_ids"]
+        read_only_fields = ["id", "created_at"]
