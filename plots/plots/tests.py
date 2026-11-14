@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 from .models import (Announcement, Booking, House, ManagerInvitation,
                      ManagerProfile, MpesaPayment, PaymentPeriod)
 
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
 class UrbanNestAPITests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -99,7 +100,7 @@ class UrbanNestAPITests(TestCase):
         self.assertEqual(self.client.get("/api/houses/").status_code, 401)
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"], MAILERS={"default": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"}})
 class ManagerAPITests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -124,10 +125,17 @@ class ManagerAPITests(TestCase):
         self.auth(self.manager)
         self.assertEqual(self.client.get("/api/manager/dashboard/").status_code, 200)
         self.assertEqual(self.client.get("/api/manager/invitations/").status_code, 403)
+        self.assertEqual(self.client.post("/api/manager/invitations/", {"email": "new@example.test"}, format="json").status_code, 403)
         self.assertEqual(self.client.get("/api/manager/managers/").status_code, 403)
 
     def test_main_manager_can_invite_and_cancel_and_acceptance_is_single_use(self):
         self.auth(self.main)
+        cancelled = self.client.post("/api/manager/invitations/", {"email": "cancelme@example.test"}, format="json")
+        self.assertEqual(cancelled.status_code, 201)
+        cancel_record = ManagerInvitation.objects.get(pk=cancelled.data["id"])
+        self.assertEqual(self.client.delete(f"/api/manager/invitations/{cancel_record.pk}/").status_code, 204)
+        cancel_record.refresh_from_db()
+        self.assertEqual(cancel_record.status, "cancelled")
         response = self.client.post("/api/manager/invitations/", {"email": "newmanager@example.test"}, format="json")
         self.assertEqual(response.status_code, 201)
         invitation = ManagerInvitation.objects.get(pk=response.data["id"])
@@ -140,6 +148,9 @@ class ManagerAPITests(TestCase):
         self.assertEqual(accepted.status_code, 200)
         self.assertTrue(ManagerProfile.objects.filter(user=invitee, is_main=False).exists())
         self.assertEqual(self.client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json").status_code, 404)
+        self.auth(self.main)
+        self.assertEqual(self.client.delete(f"/api/manager/managers/{ManagerProfile.objects.get(user=invitee).pk}/").status_code, 204)
+        self.assertFalse(ManagerProfile.objects.filter(user=invitee).exists())
 
     def test_invitation_email_mismatch_expiry_and_reuse_are_rejected(self):
         token = "secret-token"
@@ -195,17 +206,39 @@ class ManagerAPITests(TestCase):
         self.assertEqual(self.client.get("/api/manager/payments/").data["results"][0]["id"], payment.id)
         self.auth(self.other)
         self.assertEqual(self.client.get(f"/api/payments/{payment.pk}/").status_code, 404)
+        self.auth(self.manager)
+        self.assertEqual(self.client.patch(f"/api/manager/payments/{payment.pk}/", {"status": "success"}, format="json").status_code, 404)
 
     def test_announcements_targeting_and_dashboard_counts_database_records(self):
         Announcement.objects.create(title="Everyone", message="Hello", is_published=True)
         targeted = Announcement.objects.create(title="Only tenant", message="Hi", is_published=True)
         targeted.recipients.add(self.tenant)
         Announcement.objects.create(title="Draft", message="Not published", is_published=False)
+        today = timezone.localdate()
+        Booking.objects.create(user=self.tenant, house=self.house, check_in=today, check_out=today + timedelta(days=2), total_price="2400")
         self.auth(self.tenant)
         titles = {a["title"] for a in self.client.get("/api/dashboard/").data["announcements"]}
         self.assertEqual(titles, {"Everyone", "Only tenant"})
         self.auth(self.manager)
         dashboard = self.client.get("/api/manager/dashboard/").data
         self.assertEqual(dashboard["apartments_total"], 1)
+        self.assertEqual(dashboard["apartments_available"], 0)
+        self.assertEqual(dashboard["apartments_occupied"], 1)
         self.assertEqual(dashboard["tenants_total"], 2)
-        self.assertEqual(dashboard["bookings_total"], 0)
+        self.assertEqual(dashboard["bookings_total"], 1)
+        self.assertEqual(dashboard["outstanding_balance"], "2400")
+
+    def test_manager_can_publish_announcement_to_selected_tenant(self):
+        self.auth(self.manager)
+        created = self.client.post("/api/manager/announcements/", {
+            "title": "Water outage", "message": "Tomorrow morning", "is_published": False,
+            "recipient_ids": [self.tenant.pk],
+        }, format="json")
+        self.assertEqual(created.status_code, 201)
+        self.assertFalse(created.data["is_published"])
+        published = self.client.patch(f"/api/manager/announcements/{created.data['id']}/", {"is_published": True}, format="json")
+        self.assertTrue(published.data["is_published"])
+        self.auth(self.tenant)
+        self.assertIn("Water outage", {a["title"] for a in self.client.get("/api/dashboard/").data["announcements"]})
+        self.auth(self.other)
+        self.assertNotIn("Water outage", {a["title"] for a in self.client.get("/api/dashboard/").data["announcements"]})

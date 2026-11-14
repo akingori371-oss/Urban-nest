@@ -19,7 +19,16 @@ function useResource(path) {
     } catch (err) { setError(err.message || "Could not load this page."); }
     finally { setBusy(false); }
   }
-  useEffect(() => { reload(); }, [path]);
+  useEffect(() => {
+    let active = true;
+    api(path).then(async (response) => {
+      const body = await response.json();
+      if (!response.ok) throw new Error(errorText(body));
+      if (active) { setData(body); setError(""); }
+    }).catch((err) => { if (active) setError(err.message || "Could not load this page."); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [path]);
   return { data, error, busy, reload, setData };
 }
 
@@ -170,13 +179,13 @@ export default function ManagerArea() { return <ManagerLayout />; }
 export function InvitationAccept() {
   const { token } = useParams(); const { username } = useAuth(); const [state, setState] = useState({ busy: true, error: "", message: "" });
   useEffect(() => {
-    if (!username) { setState({ busy: false, error: "", message: "Sign in with the invited email address to accept the invitation." }); return; }
+    if (!username) return;
     api(`/manager/invitations/accept/${token}/`, { method: "POST", body: JSON.stringify({}) }).then(async (response) => {
       const body = await response.json(); if (!response.ok) throw new Error(errorText(body));
       setState({ busy: false, error: "", message: body.detail });
       setTimeout(() => window.location.assign("/manager"), 600);
     }).catch((err) => setState({ busy: false, error: err.message, message: "" }));
   }, [token, username]);
-  if (!username && !state.busy) return <section className="card narrow"><h2>Accept manager invitation</h2><p>{state.message}</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link><p>New to Urban Nest? <Link to={`/register?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Create an account with the invited email</Link></p></section>;
+  if (!username) return <section className="card narrow"><h2>Accept manager invitation</h2><p>Sign in with the invited email address to accept the invitation.</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link><p>New to Urban Nest? <Link to={`/register?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Create an account with the invited email</Link></p></section>;
   return <section className="card narrow"><h2>Accept manager invitation</h2>{state.busy ? <p>Verifying invitation...</p> : <ResultMessage error={state.error} message={state.message} />}</section>;
 }

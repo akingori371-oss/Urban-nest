@@ -16,6 +16,7 @@ The project gives guests a single place to discover apartments, check date avail
 - Booking ownership and cancellation rules.
 - Daraja STK Push and callback handling restricted to Sandbox.
 - Dashboard announcements and payment due counts.
+- A role-protected manager workspace for apartment, booking, payment, announcement, tenant, and invitation management.
 
 ## Technologies
 
@@ -109,4 +110,6 @@ Payment tests should mock Safaricom requests. Never test by initiating a real pa
 ## API documentation
 
 See [docs/API.md](docs/API.md) for route methods, authentication, and request/response examples.
+
+Manager setup, roles, invitation workflow, and media storage are documented in the [manager API section](docs/API.md#manager-api).
 

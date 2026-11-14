@@ -241,7 +241,7 @@ class MpesaCallbackEvent(models.Model):
 
 class HousePhoto(models.Model):
     house = models.ForeignKey(House, on_delete=models.CASCADE, related_name="photos")
-    image = models.ImageField(upload_to="houses/%Y/%m/")
+    image = models.FileField(upload_to="houses/%Y/%m/")
     caption = models.CharField(max_length=160, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

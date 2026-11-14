@@ -4,7 +4,6 @@ djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 python-dotenv==1.2.4
 requests==2.34.2
-Pillow>=10.0,<13
 
 psycopg[binary]>=3.2,<4
 

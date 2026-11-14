@@ -18,6 +18,9 @@ class Command(BaseCommand):
     help = "Email a single-use verification invitation to the configured initial Urban Nest main manager."
 
     def handle(self, *args, **options):
+        mail_backend = settings.MAILERS.get("default", {}).get("BACKEND", "")
+        if mail_backend.endswith("console.EmailBackend") or mail_backend.endswith("locmem.EmailBackend"):
+            raise CommandError("Configure a secure delivery email backend before provisioning the main manager.")
         user = get_user_model().objects.filter(email__iexact=MAIN_EMAIL, is_active=True).first()
         if not user:
             raise CommandError(f"Create an active account for {MAIN_EMAIL} first. The command will not create or promote accounts by email alone.")

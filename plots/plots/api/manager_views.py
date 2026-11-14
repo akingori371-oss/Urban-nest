@@ -12,7 +12,6 @@ from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from PIL import Image, UnidentifiedImageError
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.pagination import PageNumberPagination
@@ -30,6 +29,16 @@ User = get_user_model()
 MAIN_MANAGER_EMAIL = "akingori371@gmail.com"
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _valid_image_file(upload):
+    header = upload.read(12)
+    upload.seek(0)
+    return (
+        (upload.content_type == "image/jpeg" and header.startswith(b"\xff\xd8\xff"))
+        or (upload.content_type == "image/png" and header.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (upload.content_type == "image/webp" and header[:4] == b"RIFF" and header[8:12] == b"WEBP")
+    )
 
 
 class ManagerPagination(PageNumberPagination):
@@ -126,13 +135,7 @@ def manager_house_photos(request, pk):
         return Response({"detail": "Images must be 8 MB or smaller."}, status=400)
     if upload.content_type not in ALLOWED_IMAGE_TYPES:
         return Response({"detail": "Use a JPEG, PNG, or WebP image."}, status=400)
-    try:
-        image = Image.open(upload)
-        if image.format not in {"JPEG", "PNG", "WEBP"}:
-            raise ValueError("Unsupported image format")
-        image.verify()
-        upload.seek(0)
-    except (UnidentifiedImageError, OSError, ValueError):
+    if not _valid_image_file(upload):
         return Response({"detail": "The uploaded file is not a valid JPEG, PNG, or WebP image."}, status=400)
     photo = HousePhoto.objects.create(house=house, image=upload, caption=request.data.get("caption", ""))
     return Response(HousePhotoSerializer(photo, context={"request": request}).data, status=201)
@@ -147,13 +150,7 @@ def manager_house_photo_detail(request, pk, photo_pk):
         upload = request.FILES.get("image")
         if upload is None or upload.size > MAX_PHOTO_BYTES or upload.content_type not in ALLOWED_IMAGE_TYPES:
             return Response({"detail": "Select a JPEG, PNG, or WebP image no larger than 8 MB."}, status=400)
-        try:
-            image = Image.open(upload)
-            if image.format not in {"JPEG", "PNG", "WEBP"}:
-                raise ValueError("Unsupported image format")
-            image.verify()
-            upload.seek(0)
-        except (UnidentifiedImageError, OSError, ValueError):
+        if not _valid_image_file(upload):
             return Response({"detail": "The uploaded file is not a valid image."}, status=400)
         photo.image.delete(save=False)
         photo.image = upload
@@ -314,6 +311,9 @@ def _send_invitation(invitation, token, request):
 @permission_classes([IsMainManager])
 def manager_invitations(request):
     if request.method == "POST":
+        mail_backend = settings.MAILERS.get("default", {}).get("BACKEND", "")
+        if mail_backend.endswith("console.EmailBackend"):
+            return Response({"detail": "Manager invitations are unavailable until a delivery email backend is configured."}, status=503)
         email = (request.data.get("email") or "").strip().lower()
         if not email or email == MAIN_MANAGER_EMAIL:
             return Response({"detail": "Enter a valid invited-manager email."}, status=400)
