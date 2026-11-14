@@ -33,7 +33,10 @@ export default function Houses() {
     }
   }, [params, page]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   function searchHouses(event) {
     event.preventDefault();
@@ -89,3 +92,4 @@ export default function Houses() {
     </section>
   );
 }
+

@@ -30,7 +30,10 @@ export default function HouseDetail() {
     }
   }, [id, params]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   function updateDates(event) {
     event.preventDefault();
@@ -117,3 +120,4 @@ export default function HouseDetail() {
     </section>
   );
 }
+
