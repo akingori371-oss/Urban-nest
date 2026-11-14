@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 import corsheaders
 
@@ -16,10 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-local-development-only")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY before starting Django.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "true").strip().lower() in {"1", "true", "yes", "on"}
+DEBUG = os.getenv("DJANGO_DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",") if host.strip()]
 
@@ -159,10 +162,9 @@ MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
 MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
 MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL", "")
 MPESA_ENVIRONMENT = os.getenv("MPESA_ENVIRONMENT", "sandbox").strip().lower()
-if MPESA_ENVIRONMENT not in {"sandbox", "production"}:
-    raise ValueError("MPESA_ENVIRONMENT must be sandbox or production")
-MPESA_API_BASE_URL = ("https://sandbox.safaricom.co.ke" if MPESA_ENVIRONMENT == "sandbox"
-                      else "https://api.safaricom.co.ke")
+if MPESA_ENVIRONMENT != "sandbox":
+    raise ValueError("Only the Daraja Sandbox environment is enabled.")
+MPESA_API_BASE_URL = "https://sandbox.safaricom.co.ke"
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = True

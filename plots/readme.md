@@ -1,155 +1,64 @@
-BookIt API
+﻿# Urban Nest
 
-A house booking REST API built with Django and Django REST Framework. Users register, log in with a token, search for houses that are free on their dates, book, and pay. Stays longer than 30 nights are split into 30-day payment periods.
+Urban Nest is a Django REST Framework booking API with a React/Vite client. Stays longer than 30 nights have 30-day payment periods. M-Pesa uses Safaricom Daraja STK Push and is restricted to Sandbox.
 
-The project also includes a server-rendered website (login, booking pages, owner dashboard), but this README focuses on the API.
+## Requirements
 
-Features
-Token authentication: register, login, current user
-Search houses and filter by check-in and check-out dates
-Create and cancel bookings with server-side validation (no past dates, no double-booking)
-Automatic total price (nights x price per night)
-Payment periods for stays over 30 nights
-Mock M-Pesa payment that returns a receipt
-Per-user data access: users only see their own bookings
-Superuser-only endpoints, plus Django admin for managing houses and announcements
-Tech stack
-Python 3.13
-Django
-Django REST Framework (with rest_framework.authtoken)
-SQLite
-Project structure
-Urban-nest/
-├── manage.py
-└── plots/                  # project and app in one
-    ├── settings.py
-    ├── urls.py
-    ├── models.py           # House, Booking, PaymentPeriod, Review, Announcement, Favorite, LoginEvent
-    ├── views.py            # website views
-    ├── forms.py
-    ├── api/
-    │   ├── urls.py
-    │   ├── views.py        # API views
-    │   └── serializers.py
-    ├── management/
-    │   └── commands/
-    │       └── seed.py     # demo data
-    └── templates/
-Setup
-bash
-git clone <your-repo-url>
-cd Urban-nest
+- Python 3.13
+- Node.js and npm
+- Daraja Sandbox app and a publicly reachable HTTPS callback URL for end-to-end payment testing
 
-python -m venv myenv
-myenv\Scripts\activate          # Windows
-# source myenv/bin/activate     # macOS / Linux
+## Backend setup (PowerShell)
 
-pip install django djangorestframework requests
+From the repository root:
 
-python manage.py makemigrations plots
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py seed           # optional demo data
-python manage.py runserver
+    py -3.13 -m venv myenv
+    .myenvScriptsActivate.ps1
+    pip install -r plotsequirements.txt
+    $env:DJANGO_SECRET_KEY = (py -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+    $env:DJANGO_DEBUG = "true"
+    $env:DJANGO_ALLOWED_HOSTS = "localhost,127.0.0.1"
+    $env:MPESA_ENVIRONMENT = "sandbox"
+    $env:MPESA_CONSUMER_KEY = "<Sandbox consumer key>"
+    $env:MPESA_CONSUMER_SECRET = "<Sandbox consumer secret>"
+    $env:MPESA_PASSKEY = "<Sandbox passkey>"
+    $env:MPESA_SHORTCODE = "174379"
+    $env:MPESA_CALLBACK_URL = "<public HTTPS callback URL>/api/mpesa/callback/"
+    Set-Location plots
+    python manage.py check
+    python manage.py runserver
 
-The API is then available at http://127.0.0.1:8000/api/.
+Keep local credentials in an ignored .env file if preferred; never commit it. DJANGO_SECRET_KEY is required. DEBUG defaults to false and ALLOWED_HOSTS defaults to loopback hosts. Production Daraja is rejected.
 
-Required settings
-python
-INSTALLED_APPS = [
-    # ...
-    "rest_framework",
-    "rest_framework.authtoken",
-    "plots",
-]
+## Frontend setup
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-}
-Demo data
+In another terminal:
 
-python manage.py seed creates 6 houses, guests guest1 to guest10 (password pass12345), bookings, payment periods, reviews and login events. Re-running it rebuilds the guest accounts. Delete or change these accounts before deploying anywhere public.
+    Set-Location plotsookit-ui
+    npm ci
+    npm run dev
 
-Authentication
+Vite proxies /api requests to Django at http://127.0.0.1:8000.
 
-Register or log in to get a token, then send it in the Authorization header on every other request:
+## API overview
 
-Authorization: Token <your token>
+All routes are mounted under /api/. Authentication uses Simple JWT bearer access tokens.
 
-The word Token and the space after it are required.
+- POST /auth/register/, POST /auth/login/, POST /auth/token/refresh/
+- GET /auth/me/, GET /houses/
+- GET and POST /bookings/, POST /bookings/<id>/cancel/
+- GET /bookings/<id>/periods/
+- POST /pay/booking/<id>/, POST /pay/period/<id>/
+- GET /payments/<id>/ (owner-only status and receipt)
+- POST /mpesa/callback/ (Daraja callback)
+- GET /dashboard/
 
-Endpoints
-Method	Endpoint	Access	Description
-POST	/api/auth/register/	Anyone	Create an account, returns a token
-POST	/api/auth/login/	Anyone	Log in, returns a token
-GET	/api/auth/me/	User	Current user
-GET	/api/houses/	User	List houses. Add ?check_in=YYYY-MM-DD&check_out=YYYY-MM-DD to see only free ones
-GET	/api/bookings/	User	Your bookings
-POST	/api/bookings/	User	Create a booking
-POST	/api/bookings/<id>/cancel/	Owner	Cancel a booking
-GET	/api/bookings/<id>/periods/	Owner	Payment periods of a long stay
-POST	/api/pay/booking/<id>/	Owner	Pay a short stay (mock M-Pesa)
-POST	/api/pay/period/<id>/	Owner	Pay one period of a long stay (mock M-Pesa)
-GET	/api/dashboard/	User	Payments due and announcements
-GET	/api/users/	Superuser	List all users
-GET	/api/users/<id>/	Superuser	One user with their bookings
-Example requests
+The frontend uses Authorization: Bearer <access token>. Successful callbacks update the booking or period; payment status includes the receipt for its owner.
 
-Register
+## Database and migrations
 
-POST /api/auth/register/
-{"username": "demo1", "email": "demo1@example.com", "password": "Pass12345!"}
+SQLite is used for local development. On a new local database, run python manage.py migrate. Migration 0005 is included but was not applied to the existing database in this workspace. Back up local data before applying migrations yourself.
 
-Response: 201 with {"token": "...", "username": "demo1"}
+## Verification
 
-Find free houses
-
-GET /api/houses/?check_in=2026-12-01&check_out=2026-12-05
-
-Create a booking
-
-POST /api/bookings/
-{"house": 1, "check_in": "2026-12-01", "check_out": "2026-12-05"}
-
-house is the house id. The server sets the user from the token and calculates the total price.
-
-Pay a short stay
-
-POST /api/pay/booking/<booking id>/
-{"phone": "0712345678"}
-
-Response: {"status": "success", "receipt": "MOCK...", "amount": "175.00", ...}
-
-Use the booking id (from the booking response), not the house id.
-
-Business rules
-Check-in cannot be in the past.
-Check-out must be after check-in.
-A house cannot be booked if a confirmed booking overlaps the dates. Cancelled bookings free the house.
-A stay of 30 nights or less is paid once. A longer stay gets one payment period per 30 days (the last may be shorter).
-Users can only view, cancel and pay their own bookings.
-Status codes
-Code	Meaning
-200 / 201	Success / created
-400	Validation failed (past date, already booked, already paid)
-401	Missing or invalid token
-403	Logged in but not allowed (for example a guest on a superuser endpoint)
-404	Not found, or not yours
-Testing with Postman
-POST /api/auth/login/ with raw JSON and copy the token.
-Add the header Authorization: Token <token> to later requests.
-For POST requests, set Body to raw and the type to JSON.
-Limitations
-Payments are simulated and not connected to the real M-Pesa.
-Tokens do not expire.
-SQLite is used for development only.
-Booking overlap is checked in the application, not by a database constraint.
-Next steps
-Real M-Pesa STK Push integration
-Review and favorite endpoints
-Superuser analytics endpoints
-Expiring tokens or JWT
+From plots/ run python manage.py check, python manage.py makemigrations --check --dry-run, and python manage.py test. From plots/bookit-ui/ run npm.cmd run lint and npm.cmd run build. Automated payment tests mock Daraja initiation and do not make real requests.
