@@ -72,9 +72,10 @@ function ApartmentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", location: "", description: "", bedrooms: 1, price_per_night: "", is_active: true });
+  const [bookings, setBookings] = useState([]);
   const fields = [["name", "Name"], ["location", "Location"], ["bedrooms", "Bedrooms"], ["price_per_night", "Nightly price (KES)"]];
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [photos, setPhotos] = useState([]);
-  useEffect(() => { if (id) api(`/manager/apartments/${id}/`).then((r) => r.json()).then((d) => { setForm(d); setPhotos(d.photos || []); }).catch((e) => setError(e.message)); }, [id]);
+  useEffect(() => { if (id) api(`/manager/apartments/${id}/`).then((r) => r.json()).then((d) => { setForm(d); setPhotos(d.photos || []); setBookings(d.bookings || []); }).catch((e) => setError(e.message)); }, [id]);
   function change(e) { setForm({ ...form, [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value }); }
   async function submit(e) {
     e.preventDefault(); setBusy(true); setError("");
@@ -97,7 +98,7 @@ function ApartmentForm() {
   }
   return <><div className="manager-page-title"><div><p className="manager-eyebrow">PROPERTY</p><h1>{id ? "Edit apartment" : "Add apartment"}</h1></div></div><ResultMessage error={error} />
     <form className="manager-form" onSubmit={submit}>{fields.map(([name, label]) => <label key={name}>{label}<input name={name} type={name === "bedrooms" || name === "price_per_night" ? "number" : "text"} min={name === "bedrooms" ? 1 : undefined} step={name === "price_per_night" ? "0.01" : undefined} value={form[name]} onChange={change} required /></label>)}<label>Description<textarea name="description" value={form.description} onChange={change} rows="5" /></label>{id && <label className="manager-check"><input type="checkbox" name="is_active" checked={form.is_active} onChange={change} /> Active and available to tenants</label>}<button className="manager-primary" disabled={busy}>{busy ? "Saving..." : "Save apartment"}</button></form>
-    {id && <section className="manager-panel manager-photo-panel"><h2>Photographs</h2><p>JPEG, PNG, or WebP · maximum 8 MB each.</p><input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} />{photos.map((photo) => <div className="manager-photo" key={photo.id}><img src={photo.image} alt={photo.caption || "Apartment"} /><button className="manager-danger-link" onClick={() => removePhoto(photo.id)}>Remove photo</button></div>)}</section>}
+    {id && <><section className="manager-panel manager-photo-panel"><h2>Photographs</h2><p>JPEG, PNG, or WebP · maximum 8 MB each.</p><input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} />{photos.map((photo) => <div className="manager-photo" key={photo.id}><img src={photo.image} alt={photo.caption || "Apartment"} /><input aria-label="Replace photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; const body = new FormData(); body.append("image", file); const response = await api(`/manager/apartments/${id}/photos/${photo.id}/`, { method: "PUT", body }); const data = await response.json(); if (response.ok) setPhotos(photos.map((item) => item.id === photo.id ? data : item)); else setError(errorText(data)); e.target.value = ""; }} /><button className="manager-danger-link" onClick={() => removePhoto(photo.id)}>Remove photo</button></div>)}</section><section className="manager-panel"><h2>Recent booking activity</h2>{bookings.length ? bookings.map((booking) => <p key={booking.id}>Booking #{booking.id} · {booking.check_in} – {booking.check_out} · {booking.status}</p>) : <p>No bookings for this apartment.</p>}</section></>}
   </>;
 }
 

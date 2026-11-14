@@ -10,7 +10,7 @@ class House(models.Model):
     description = models.TextField(blank=True)
     bedrooms = models.PositiveSmallIntegerField(default=1)
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     def is_free(self, check_in, check_out):
         return not self.booking_set.filter(
@@ -28,7 +28,7 @@ class Booking(models.Model):
     check_in = models.DateField()
     check_out = models.DateField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    status = models.CharField(max_length=10, choices=STATUS, default="confirmed")
+    status = models.CharField(max_length=10, choices=STATUS, default="confirmed", db_index=True)
     paid = models.BooleanField(default=False)          # used for short stays only
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -130,7 +130,7 @@ class Announcement(models.Model):
     title = models.CharField(max_length=150)
     message = models.TextField()
     created_at = models.DateTimeField(default=timezone.now)
-    is_published = models.BooleanField(default=True)
+    is_published = models.BooleanField(default=True, db_index=True)
     recipients = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="targeted_announcements")
 
     class Meta:
@@ -208,7 +208,8 @@ class MpesaPayment(models.Model):
     status = models.CharField(
         max_length=10,
         choices=STATUS,
-        default="pending"
+        default="pending",
+        db_index=True,
     )
 
     receipt = models.CharField(max_length=50, blank=True)

@@ -224,9 +224,15 @@ def manager_payments(request):
     if request.query_params.get("apartment"):
         queryset = queryset.filter(Q(booking__house_id=request.query_params["apartment"]) | Q(period__booking__house_id=request.query_params["apartment"]))
     if request.query_params.get("date_from"):
-        queryset = queryset.filter(created_at__date__gte=request.query_params["date_from"])
+        date_from = parse_date(request.query_params["date_from"])
+        if not date_from:
+            return Response({"detail": "date_from must be YYYY-MM-DD."}, status=400)
+        queryset = queryset.filter(created_at__date__gte=date_from)
     if request.query_params.get("date_to"):
-        queryset = queryset.filter(created_at__date__lte=request.query_params["date_to"])
+        date_to = parse_date(request.query_params["date_to"])
+        if not date_to:
+            return Response({"detail": "date_to must be YYYY-MM-DD."}, status=400)
+        queryset = queryset.filter(created_at__date__lte=date_to)
     return paginated(request, queryset, ManagerPaymentSerializer)
 
 
