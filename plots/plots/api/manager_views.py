@@ -12,6 +12,7 @@ from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from PIL import Image, UnidentifiedImageError
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.pagination import PageNumberPagination
@@ -119,20 +120,46 @@ def manager_house_detail(request, pk):
 def manager_house_photos(request, pk):
     house = get_object_or_404(House, pk=pk)
     upload = request.FILES.get("image")
-    if not upload:
+    if upload is None:
         return Response({"detail": "Select an image file."}, status=400)
     if upload.size > MAX_PHOTO_BYTES:
         return Response({"detail": "Images must be 8 MB or smaller."}, status=400)
     if upload.content_type not in ALLOWED_IMAGE_TYPES:
         return Response({"detail": "Use a JPEG, PNG, or WebP image."}, status=400)
+    try:
+        image = Image.open(upload)
+        if image.format not in {"JPEG", "PNG", "WEBP"}:
+            raise ValueError("Unsupported image format")
+        image.verify()
+        upload.seek(0)
+    except (UnidentifiedImageError, OSError, ValueError):
+        return Response({"detail": "The uploaded file is not a valid JPEG, PNG, or WebP image."}, status=400)
     photo = HousePhoto.objects.create(house=house, image=upload, caption=request.data.get("caption", ""))
     return Response(HousePhotoSerializer(photo, context={"request": request}).data, status=201)
 
 
-@api_view(["DELETE"])
+@api_view(["PUT", "DELETE"])
+@parser_classes([MultiPartParser, FormParser])
 @permission_classes([IsManager])
 def manager_house_photo_detail(request, pk, photo_pk):
     photo = get_object_or_404(HousePhoto, pk=photo_pk, house_id=pk)
+    if request.method == "PUT":
+        upload = request.FILES.get("image")
+        if upload is None or upload.size > MAX_PHOTO_BYTES or upload.content_type not in ALLOWED_IMAGE_TYPES:
+            return Response({"detail": "Select a JPEG, PNG, or WebP image no larger than 8 MB."}, status=400)
+        try:
+            image = Image.open(upload)
+            if image.format not in {"JPEG", "PNG", "WEBP"}:
+                raise ValueError("Unsupported image format")
+            image.verify()
+            upload.seek(0)
+        except (UnidentifiedImageError, OSError, ValueError):
+            return Response({"detail": "The uploaded file is not a valid image."}, status=400)
+        photo.image.delete(save=False)
+        photo.image = upload
+        photo.caption = request.data.get("caption", photo.caption)
+        photo.save()
+        return Response(HousePhotoSerializer(photo, context={"request": request}).data)
     photo.image.delete(save=False)
     photo.delete()
     return Response(status=204)

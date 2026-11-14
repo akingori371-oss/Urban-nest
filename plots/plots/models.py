@@ -253,6 +253,9 @@ class ManagerProfile(models.Model):
     is_main = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["is_main"], condition=models.Q(is_main=True), name="only_one_main_manager")]
+
     def __str__(self):
         return f"{self.user.email} ({'main' if self.is_main else 'manager'})"
 
