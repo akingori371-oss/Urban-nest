@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api, errorText } from "../api.js";
 import { useAuth } from "../auth.js";
 import "./Manager.css";
@@ -95,7 +95,7 @@ function ApartmentForm() {
     if (response.ok) setPhotos(photos.filter((photo) => photo.id !== photoId));
   }
   return <><div className="manager-page-title"><div><p className="manager-eyebrow">PROPERTY</p><h1>{id ? "Edit apartment" : "Add apartment"}</h1></div></div><ResultMessage error={error} />
-    <form className="manager-form" onSubmit={submit}>{[["name", "Name"], ["location", "Location"], ["bedrooms", "Bedrooms"], ["price_per_night", "Nightly price (KES)"]].map(([name, label]) => <label key={name}>{label}<input name={name} type={name === "bedrooms" ? "number" : "text"} min={name === "bedrooms" ? 1 : undefined} step={name === "price_per_night" ? "0.01" : undefined} value={form[name]} onChange={change} required /></label>)}<label>Description<textarea name="description" value={form.description} onChange={change} rows="5" /></label>{id && <label className="manager-check"><input type="checkbox" name="is_active" checked={form.is_active} onChange={change} /> Active and available to tenants</label>}<button className="manager-primary" disabled={busy}>{busy ? "Saving..." : "Save apartment"}</button></form>
+    <form className="manager-form" onSubmit={submit}>{[["name", "Name"], ["location", "Location"], ["bedrooms", "Bedrooms"], ["price_per_night", "Nightly price (KES)"].map(([name, label]) => <label key={name}>{label}<input name={name} type={name === "bedrooms" || name === "price_per_night" ? "number" : "text"} min={name === "bedrooms" ? 1 : undefined} step={name === "price_per_night" ? "0.01" : undefined} value={form[name]} onChange={change} required /></label>)}<label>Description<textarea name="description" value={form.description} onChange={change} rows="5" /></label>{id && <label className="manager-check"><input type="checkbox" name="is_active" checked={form.is_active} onChange={change} /> Active and available to tenants</label>}<button className="manager-primary" disabled={busy}>{busy ? "Saving..." : "Save apartment"}</button></form>
     {id && <section className="manager-panel manager-photo-panel"><h2>Photographs</h2><p>JPEG, PNG, or WebP · maximum 8 MB each.</p><input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} />{photos.map((photo) => <div className="manager-photo" key={photo.id}><img src={photo.image} alt={photo.caption || "Apartment"} /><button className="manager-danger-link" onClick={() => removePhoto(photo.id)}>Remove photo</button></div>)}</section>}
   </>;
 }
@@ -165,7 +165,7 @@ function ManagerLayout() {
 export default function ManagerArea() { return <ManagerLayout />; }
 
 export function InvitationAccept() {
-  const { token } = useParams(); const { username } = useAuth(); const navigate = useNavigate(); const [params] = useSearchParams(); const [state, setState] = useState({ busy: true, error: "", message: "" });
+  const { token } = useParams(); const { username } = useAuth(); const [state, setState] = useState({ busy: true, error: "", message: "" });
   useEffect(() => {
     if (!username) { setState({ busy: false, error: "", message: "Sign in with the invited email address to accept the invitation." }); return; }
     api(`/manager/invitations/accept/${token}/`, { method: "POST", body: JSON.stringify({}) }).then(async (response) => {
@@ -174,6 +174,6 @@ export function InvitationAccept() {
       setTimeout(() => window.location.assign("/manager"), 600);
     }).catch((err) => setState({ busy: false, error: err.message, message: "" }));
   }, [token, username]);
-  if (!username && !state.busy) return <section className="card narrow"><h2>Accept manager invitation</h2><p>{state.message}</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link>{params.get("next") && navigate}</section>;
+  if (!username && !state.busy) return <section className="card narrow"><h2>Accept manager invitation</h2><p>{state.message}</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link></section>;
   return <section className="card narrow"><h2>Accept manager invitation</h2>{state.busy ? <p>Verifying invitation...</p> : <ResultMessage error={state.error} message={state.message} />}</section>;
 }
