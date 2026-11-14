@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -52,7 +52,8 @@ def manager_dashboard(request):
                                           check_out__gt=today).values("house_id").distinct()
     payments = MpesaPayment.objects.all()
     long_outstanding = PaymentPeriod.objects.filter(booking__status="confirmed", paid=False).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    short_outstanding = Booking.objects.filter(status="confirmed", nights__lte=30, paid=False).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
+    short_outstanding = Booking.objects.filter(status="confirmed", paid=False,
+        check_out__lte=F("check_in") + timedelta(days=30)).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
     tenants = User.objects.filter(manager_profile__isnull=True, is_superuser=False)
     return Response({
         "apartments_total": House.objects.count(),
@@ -243,7 +244,8 @@ def manager_tenants(request):
     results = []
     for user in page:
         bookings = Booking.objects.filter(user=user)
-        short_due = sum((b.total_price for b in bookings.filter(status="confirmed", paid=False) if not b.is_long), Decimal("0"))
+        short_due = bookings.filter(status="confirmed", paid=False,
+            check_out__lte=F("check_in") + timedelta(days=30)).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
         period_due = PaymentPeriod.objects.filter(booking__user=user, booking__status="confirmed", paid=False).aggregate(total=Sum("amount"))["total"] or Decimal("0")
         results.append({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active, "bookings_count": bookings.count(), "outstanding_balance": str(short_due + period_due)})
     return paginator.get_paginated_response(results)
