@@ -1,9 +1,9 @@
-from django.contrib.auth import get_user_model
+﻿from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
-from ..models import House, Booking, PaymentPeriod
-from django.contrib.auth.password_validation import validate_password
+
+from ..models import Booking, House, PaymentPeriod, Review
 
 User = get_user_model()
 
@@ -28,6 +28,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, data):
         return User.objects.create_user(**data)
 
+
 class HouseSerializer(serializers.ModelSerializer):
     avg_rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
@@ -36,6 +37,34 @@ class HouseSerializer(serializers.ModelSerializer):
         model = House
         fields = ["id", "name", "location", "bedrooms", "price_per_night",
                   "description", "avg_rating", "review_count"]
+
+
+class ReviewSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ["rating", "comment", "created_at"]
+
+
+class HouseDetailSerializer(HouseSerializer):
+    reviews = ReviewSummarySerializer(many=True, read_only=True)
+    availability = serializers.SerializerMethodField()
+
+    class Meta(HouseSerializer.Meta):
+        fields = HouseSerializer.Meta.fields + ["reviews", "availability"]
+
+    def get_availability(self, house):
+        request = self.context.get("request")
+        if request is None:
+            return None
+        check_in = request.query_params.get("check_in")
+        check_out = request.query_params.get("check_out")
+        if not check_in or not check_out:
+            return None
+        from django.utils.dateparse import parse_date
+        start, end = parse_date(check_in), parse_date(check_out)
+        if start is None or end is None or end <= start:
+            return None
+        return house.is_free(start, end)
 
 
 class BookingSerializer(serializers.ModelSerializer):

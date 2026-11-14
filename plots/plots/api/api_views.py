@@ -1,4 +1,4 @@
-
+﻿
 import random
 import re
 import base64
@@ -18,6 +18,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import (
@@ -26,7 +27,7 @@ from ..models import (
 
 from .serializers import (
     RegisterSerializer, HouseSerializer,
-    BookingSerializer, PaymentPeriodSerializer
+    BookingSerializer, PaymentPeriodSerializer, HouseDetailSerializer
 )
  
 def err(msg, code=400):
@@ -85,25 +86,63 @@ def me(request):
  
  
 # ---------- Houses ----------
+class HousePagination(PageNumberPagination):
+    page_size = 20
+    page_query_param = "page"
+
+
+def validate_house_dates(request):
+    raw_in = request.query_params.get("check_in")
+    raw_out = request.query_params.get("check_out")
+    if bool(raw_in) != bool(raw_out):
+        return None, None, err("Send both check_in and check_out as YYYY-MM-DD.")
+    if not raw_in:
+        return None, None, None
+    cin, cout = parse_date(raw_in), parse_date(raw_out)
+    if cin is None or cout is None:
+        return None, None, err("Dates must be YYYY-MM-DD.")
+    if cout <= cin:
+        return None, None, err("check_out must be after check_in.")
+    return cin, cout, None
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def house_list(request):
+    cin, cout, date_error = validate_house_dates(request)
+    if date_error:
+        return date_error
     qs = House.objects.annotate(avg_rating=Avg("reviews__rating"),
                                 review_count=Count("reviews"))
-    try:
-        cin = parse_date(request.query_params.get("check_in") or "")
-        cout = parse_date(request.query_params.get("check_out") or "")
-    except ValueError:
-        return err("Dates must be YYYY-MM-DD.")
     if cin and cout:
-        if cout <= cin:
-            return err("check_out must be after check_in.")
         busy = Booking.objects.filter(status="confirmed", check_in__lt=cout,
                                       check_out__gt=cin).values_list("house_id", flat=True)
         qs = qs.exclude(id__in=busy)
-    return Response(HouseSerializer(qs, many=True).data)
- 
- 
+    search = request.query_params.get("search", "").strip()
+    if search:
+        qs = qs.filter(Q(name__icontains=search) | Q(location__icontains=search)
+                       | Q(description__icontains=search))
+    ordering = request.query_params.get("ordering", "id")
+    allowed_ordering = {"id", "name", "location", "bedrooms", "price_per_night"}
+    if ordering.lstrip("-") not in allowed_ordering:
+        return err("Unsupported ordering field.")
+    qs = qs.order_by(ordering)
+    paginator = HousePagination()
+    page = paginator.paginate_queryset(qs, request)
+    return paginator.get_paginated_response(HouseSerializer(page, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def house_detail(request, pk):
+    cin, cout, date_error = validate_house_dates(request)
+    if date_error:
+        return date_error
+    house = get_object_or_404(House.objects.annotate(
+        avg_rating=Avg("reviews__rating"), review_count=Count("reviews")
+    ).prefetch_related("reviews"), pk=pk)
+    return Response(HouseDetailSerializer(house, context={"request": request}).data)
+
 # ---------- Bookings ----------
 def own_booking(request, pk):
     return get_object_or_404(Booking.objects.select_related("house"),

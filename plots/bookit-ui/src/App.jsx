@@ -4,6 +4,7 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Houses from "./pages/Houses.jsx";
+import HouseDetail from "./pages/HouseDetail.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
 import Landing from "./pages/Landing.jsx";
 import BookingCard from "./pages/BookingCard.jsx";
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/houses" element={<Protected><Houses /></Protected>} />
+          <Route path="/houses/:id" element={<Protected><HouseDetail /></Protected>} />
           <Route path="/bookings" element={<Protected><MyBookings /></Protected>} />
           <Route path="/bookings/:id" element={<Protected><BookingCard /></Protected>} />
         </Routes>
@@ -55,4 +57,5 @@ export default function App() {
     </>
   );
 }
+
 

@@ -33,7 +33,7 @@ export default function Landing() {
           Find a free house.<br />Book it in minutes.
         </h1>
         <p className="mx-auto mb-8 max-w-xl text-lg text-indigo-100">
-          BookIt shows only the houses that are free on your dates, works out the price for you,
+          Urban Nest shows apartments that are free on your dates, works out the price for you,
           and lets you pay with M-Pesa. Staying longer than a month? Pay month by month.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
@@ -92,7 +92,8 @@ export default function Landing() {
         </div>
       </section>
 
-      <p className="my-10 text-center text-sm text-slate-500">Â© BookIt Â· Built with Django and React</p>
+      <p className="my-10 text-center text-sm text-slate-500">© Urban Nest · Built with Django and React</p>
     </div>
   );
 }
+

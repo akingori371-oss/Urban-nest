@@ -1,4 +1,4 @@
-
+﻿
 from django.urls import path
 from . import api_views as v
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Houses
     path("houses/", v.house_list),
+    path("houses/<int:pk>/", v.house_detail),
 
     # Bookings
     path("bookings/", v.booking_list),
@@ -26,3 +27,4 @@ urlpatterns = [
     # Dashboard
     path("dashboard/", v.dashboard),
 ]
+
