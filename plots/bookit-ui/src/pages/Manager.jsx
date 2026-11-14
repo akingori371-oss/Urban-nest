@@ -72,6 +72,7 @@ function ApartmentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", location: "", description: "", bedrooms: 1, price_per_night: "", is_active: true });
+  const fields = [["name", "Name"], ["location", "Location"], ["bedrooms", "Bedrooms"], ["price_per_night", "Nightly price (KES)"]];
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [photos, setPhotos] = useState([]);
   useEffect(() => { if (id) api(`/manager/apartments/${id}/`).then((r) => r.json()).then((d) => { setForm(d); setPhotos(d.photos || []); }).catch((e) => setError(e.message)); }, [id]);
   function change(e) { setForm({ ...form, [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value }); }
@@ -95,7 +96,7 @@ function ApartmentForm() {
     if (response.ok) setPhotos(photos.filter((photo) => photo.id !== photoId));
   }
   return <><div className="manager-page-title"><div><p className="manager-eyebrow">PROPERTY</p><h1>{id ? "Edit apartment" : "Add apartment"}</h1></div></div><ResultMessage error={error} />
-    <form className="manager-form" onSubmit={submit}>{[["name", "Name"], ["location", "Location"], ["bedrooms", "Bedrooms"], ["price_per_night", "Nightly price (KES)"].map(([name, label]) => <label key={name}>{label}<input name={name} type={name === "bedrooms" || name === "price_per_night" ? "number" : "text"} min={name === "bedrooms" ? 1 : undefined} step={name === "price_per_night" ? "0.01" : undefined} value={form[name]} onChange={change} required /></label>)}<label>Description<textarea name="description" value={form.description} onChange={change} rows="5" /></label>{id && <label className="manager-check"><input type="checkbox" name="is_active" checked={form.is_active} onChange={change} /> Active and available to tenants</label>}<button className="manager-primary" disabled={busy}>{busy ? "Saving..." : "Save apartment"}</button></form>
+    <form className="manager-form" onSubmit={submit}>{fields.map(([name, label]) => <label key={name}>{label}<input name={name} type={name === "bedrooms" || name === "price_per_night" ? "number" : "text"} min={name === "bedrooms" ? 1 : undefined} step={name === "price_per_night" ? "0.01" : undefined} value={form[name]} onChange={change} required /></label>)}<label>Description<textarea name="description" value={form.description} onChange={change} rows="5" /></label>{id && <label className="manager-check"><input type="checkbox" name="is_active" checked={form.is_active} onChange={change} /> Active and available to tenants</label>}<button className="manager-primary" disabled={busy}>{busy ? "Saving..." : "Save apartment"}</button></form>
     {id && <section className="manager-panel manager-photo-panel"><h2>Photographs</h2><p>JPEG, PNG, or WebP · maximum 8 MB each.</p><input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} />{photos.map((photo) => <div className="manager-photo" key={photo.id}><img src={photo.image} alt={photo.caption || "Apartment"} /><button className="manager-danger-link" onClick={() => removePhoto(photo.id)}>Remove photo</button></div>)}</section>}
   </>;
 }
