@@ -1,10 +1,15 @@
 ﻿from datetime import timedelta
 from unittest.mock import patch
+from urllib.parse import urlparse
+import re
+import hashlib
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
-from .models import Booking, House, MpesaPayment
+from .models import (Announcement, Booking, House, ManagerInvitation,
+                     ManagerProfile, MpesaPayment, PaymentPeriod)
 
 class UrbanNestAPITests(TestCase):
     def setUp(self):
@@ -92,3 +97,115 @@ class UrbanNestAPITests(TestCase):
         self.assertEqual(self.client.get("/api/houses/?page=abc").status_code, 404)
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get("/api/houses/").status_code, 401)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class ManagerAPITests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.tenant = User.objects.create_user(username="tenant", email="tenant@example.test", password="StrongPass123!")
+        self.other = User.objects.create_user(username="other", email="other@example.test", password="StrongPass123!")
+        self.main = User.objects.create_user(username="main", email="akingori371@gmail.com", password="StrongPass123!")
+        self.manager = User.objects.create_user(username="manager", email="manager@example.test", password="StrongPass123!")
+        self.main_profile = ManagerProfile.objects.create(user=self.main, is_main=True)
+        self.manager_profile = ManagerProfile.objects.create(user=self.manager)
+        self.house = House.objects.create(name="Managed Nest", location="Nairobi", bedrooms=2, price_per_night="1200.00")
+        self.client = APIClient()
+
+    def auth(self, user):
+        self.client.force_authenticate(user)
+
+    def test_tenant_cannot_access_manager_endpoints(self):
+        self.auth(self.tenant)
+        self.assertEqual(self.client.get("/api/manager/dashboard/").status_code, 403)
+        self.assertEqual(self.client.get("/api/manager/apartments/").status_code, 403)
+
+    def test_invited_manager_has_operations_but_not_main_controls(self):
+        self.auth(self.manager)
+        self.assertEqual(self.client.get("/api/manager/dashboard/").status_code, 200)
+        self.assertEqual(self.client.get("/api/manager/invitations/").status_code, 403)
+        self.assertEqual(self.client.get("/api/manager/managers/").status_code, 403)
+
+    def test_main_manager_can_invite_and_cancel_and_acceptance_is_single_use(self):
+        self.auth(self.main)
+        response = self.client.post("/api/manager/invitations/", {"email": "newmanager@example.test"}, format="json")
+        self.assertEqual(response.status_code, 201)
+        invitation = ManagerInvitation.objects.get(pk=response.data["id"])
+        self.assertEqual(len(mail.outbox), 1)
+        token = re.search(r"/manager/invitations/accept/([^\s]+)", mail.outbox[0].body).group(1)
+        self.assertEqual(invitation.token_hash, hashlib.sha256(token.encode()).hexdigest())
+        invitee = get_user_model().objects.create_user(username="invitee", email="newmanager@example.test", password="StrongPass123!")
+        self.auth(invitee)
+        accepted = self.client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json")
+        self.assertEqual(accepted.status_code, 200)
+        self.assertTrue(ManagerProfile.objects.filter(user=invitee, is_main=False).exists())
+        self.assertEqual(self.client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json").status_code, 404)
+
+    def test_invitation_email_mismatch_expiry_and_reuse_are_rejected(self):
+        token = "secret-token"
+        invitation = ManagerInvitation.objects.create(email=self.manager.email, token_hash=hashlib.sha256(token.encode()).hexdigest(), invited_by=self.main, expires_at=timezone.now() + timedelta(days=1))
+        self.auth(self.other)
+        self.assertEqual(self.client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json").status_code, 403)
+        invitation.expires_at = timezone.now() - timedelta(seconds=1)
+        invitation.save(update_fields=["expires_at"])
+        self.auth(self.manager)
+        self.assertEqual(self.client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json").status_code, 410)
+
+    def test_public_registration_cannot_assign_manager_role(self):
+        response = self.client.post("/api/auth/register/", {"username": "new", "email": "new@example.test", "password": "StrongPass123!", "is_manager": True, "is_superuser": True}, format="json")
+        self.assertEqual(response.status_code, 201)
+        user = get_user_model().objects.get(username="new")
+        self.assertFalse(user.is_superuser)
+        self.assertFalse(ManagerProfile.objects.filter(user=user).exists())
+
+    def test_manager_can_create_edit_and_safely_deactivate_apartment(self):
+        self.auth(self.manager)
+        created = self.client.post("/api/manager/apartments/", {"name": "New Flat", "location": "Nairobi", "bedrooms": 2, "price_per_night": "950"}, format="json")
+        self.assertEqual(created.status_code, 201)
+        pk = created.data["id"]
+        self.assertEqual(self.client.patch(f"/api/manager/apartments/{pk}/", {"price_per_night": "1050"}, format="json").status_code, 200)
+        self.assertEqual(self.client.delete(f"/api/manager/apartments/{pk}/").status_code, 200)
+        self.assertFalse(House.objects.get(pk=pk).is_active)
+        self.auth(self.tenant)
+        self.assertEqual(self.client.post("/api/manager/apartments/", {}, format="json").status_code, 403)
+
+    def test_manager_sees_all_bookings_and_tenant_sees_only_own(self):
+        a = Booking.objects.create(user=self.tenant, house=self.house, check_in=timezone.localdate() + timedelta(days=3), check_out=timezone.localdate() + timedelta(days=5), total_price="2400")
+        b = Booking.objects.create(user=self.other, house=House.objects.create(name="Other", location="Nairobi", price_per_night="500"), check_in=timezone.localdate() + timedelta(days=3), check_out=timezone.localdate() + timedelta(days=5), total_price="1000")
+        self.auth(self.manager)
+        results = self.client.get("/api/manager/bookings/").data["results"]
+        self.assertEqual({row["id"] for row in results}, {a.id, b.id})
+        self.auth(self.tenant)
+        self.assertEqual(len(self.client.get("/api/bookings/").data), 1)
+
+    def test_manager_cannot_mark_booking_paid_and_cannot_make_confirmed_overlap(self):
+        existing = Booking.objects.create(user=self.tenant, house=self.house, check_in=timezone.localdate() + timedelta(days=4), check_out=timezone.localdate() + timedelta(days=7), total_price="3600")
+        self.auth(self.manager)
+        # Manager actions only allow confirmed -> cancelled; arbitrary status/paid fields are rejected.
+        self.assertEqual(self.client.post(f"/api/manager/bookings/{existing.pk}/", {"status": "paid"}, format="json").status_code, 400)
+        self.assertFalse(Booking.objects.get(pk=existing.pk).paid)
+        self.auth(self.other)
+        overlap = self.client.post("/api/bookings/", {"house": self.house.pk, "check_in": str(existing.check_in + timedelta(days=1)), "check_out": str(existing.check_out + timedelta(days=1))}, format="json")
+        self.assertEqual(overlap.status_code, 400)
+
+    def test_manager_payment_visibility_and_tenant_ownership(self):
+        booking = Booking.objects.create(user=self.tenant, house=self.house, check_in=timezone.localdate() + timedelta(days=3), check_out=timezone.localdate() + timedelta(days=5), total_price="2400")
+        payment = MpesaPayment.objects.create(booking=booking, phone="254712345678", amount="2400", status="pending")
+        self.auth(self.manager)
+        self.assertEqual(self.client.get("/api/manager/payments/").data["results"][0]["id"], payment.id)
+        self.auth(self.other)
+        self.assertEqual(self.client.get(f"/api/payments/{payment.pk}/").status_code, 404)
+
+    def test_announcements_targeting_and_dashboard_counts_database_records(self):
+        Announcement.objects.create(title="Everyone", message="Hello", is_published=True)
+        targeted = Announcement.objects.create(title="Only tenant", message="Hi", is_published=True)
+        targeted.recipients.add(self.tenant)
+        Announcement.objects.create(title="Draft", message="Not published", is_published=False)
+        self.auth(self.tenant)
+        titles = {a["title"] for a in self.client.get("/api/dashboard/").data["announcements"]}
+        self.assertEqual(titles, {"Everyone", "Only tenant"})
+        self.auth(self.manager)
+        dashboard = self.client.get("/api/manager/dashboard/").data
+        self.assertEqual(dashboard["apartments_total"], 1)
+        self.assertEqual(dashboard["tenants_total"], 2)
+        self.assertEqual(dashboard["bookings_total"], 0)
