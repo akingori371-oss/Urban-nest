@@ -299,7 +299,8 @@ def _token_hash(token):
 
 
 def _send_invitation(invitation, token, request):
-    link = request.build_absolute_uri(f"/manager/invitations/accept/{token}")
+    base = getattr(settings, "URBAN_NEST_FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    link = f"{base}/manager/invitations/accept/{token}"
     send_mail("Urban Nest manager invitation", f"Accept your manager invitation: {link}\nThis invitation expires in 7 days.", settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False)
 
 
