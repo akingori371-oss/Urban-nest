@@ -304,7 +304,7 @@ def user_detail(request, pk):
     })
  
 def mpesa_access_token():
-    url = "f"{settings.MPESA_API_BASE_URL}/oauth/v1/generate?grant_type=client_credentials""
+    url = f"{settings.MPESA_API_BASE_URL}/oauth/v1/generate?grant_type=client_credentials"
 
     response = requests.get(
         url,
