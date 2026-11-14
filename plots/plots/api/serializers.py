@@ -33,11 +33,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 class HouseSerializer(serializers.ModelSerializer):
     avg_rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
+    photos = serializers.SerializerMethodField()
 
     class Meta:
         model = House
         fields = ["id", "name", "location", "bedrooms", "price_per_night",
-                  "description", "avg_rating", "review_count"]
+                  "description", "avg_rating", "review_count", "photos"]
+
+    def get_photos(self, house):
+        request = self.context.get("request")
+        photos = house.photos.all()[:5]
+        return [{"id": p.id, "image": request.build_absolute_uri(p.image.url) if request else p.image.url,
+                 "caption": p.caption} for p in photos]
 
 
 class ReviewSummarySerializer(serializers.ModelSerializer):
