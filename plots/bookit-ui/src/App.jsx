@@ -8,14 +8,23 @@ import HouseDetail from "./pages/HouseDetail.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
 import Landing from "./pages/Landing.jsx";
 import BookingCard from "./pages/BookingCard.jsx";
+import ManagerArea, { InvitationAccept } from "./pages/Manager.jsx";
 
 function Protected({ children }) {
-  const { username } = useAuth();
+  const { username, ready } = useAuth();
+  if (!ready) return <p role="status">Loading your account...</p>;
   return username ? children : <Navigate to="/login" replace />;
 }
 
+function ManagerProtected() {
+  const { username, isManager, ready } = useAuth();
+  if (!ready) return <p role="status">Loading your account...</p>;
+  if (!username) return <Navigate to="/login" replace />;
+  return isManager ? <ManagerArea /> : <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
-  const { username, logout } = useAuth();
+  const { username, isManager, logout } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -26,6 +35,7 @@ export default function App() {
           {username && <Link to="/dashboard">Dashboard</Link>}
           {username && <Link to="/houses">Houses</Link>}
           {username && <Link to="/bookings">My bookings</Link>}
+          {username && isManager && <Link to="/manager">Manager</Link>}
         </div>
         <div>
           {username ? (
@@ -52,6 +62,8 @@ export default function App() {
           <Route path="/houses/:id" element={<Protected><HouseDetail /></Protected>} />
           <Route path="/bookings" element={<Protected><MyBookings /></Protected>} />
           <Route path="/bookings/:id" element={<Protected><BookingCard /></Protected>} />
+          <Route path="/manager/invitations/accept/:token" element={<InvitationAccept />} />
+          <Route path="/manager/*" element={<ManagerProtected />} />
         </Routes>
       </main>
     </>
