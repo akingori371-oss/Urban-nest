@@ -175,6 +175,6 @@ export function InvitationAccept() {
       setTimeout(() => window.location.assign("/manager"), 600);
     }).catch((err) => setState({ busy: false, error: err.message, message: "" }));
   }, [token, username]);
-  if (!username && !state.busy) return <section className="card narrow"><h2>Accept manager invitation</h2><p>{state.message}</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link></section>;
+  if (!username && !state.busy) return <section className="card narrow"><h2>Accept manager invitation</h2><p>{state.message}</p><Link className="manager-primary" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link><p>New to Urban Nest? <Link to={`/register?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Create an account with the invited email</Link></p></section>;
   return <section className="card narrow"><h2>Accept manager invitation</h2>{state.busy ? <p>Verifying invitation...</p> : <ResultMessage error={state.error} message={state.message} />}</section>;
 }

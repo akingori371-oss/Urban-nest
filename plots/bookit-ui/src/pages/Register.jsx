@@ -1,10 +1,11 @@
 ﻿import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth.js";
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +16,7 @@ export default function Register() {
     setError("");
     try {
       await register(username, email, password);
-      navigate("/houses");
+      navigate(params.get("next") || "/houses", { replace: true });
     } catch (err) {
       setError(err.message);
     }
