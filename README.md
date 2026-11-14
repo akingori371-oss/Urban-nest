@@ -93,11 +93,11 @@ The Vite development server proxies API traffic to Django at http://127.0.0.1:80
 
 ## Tests and production build
 
-Backend, from plots/:
+Backend, from plots/ (test settings use an isolated in-memory SQLite database):
 
     python manage.py check
     python manage.py makemigrations --check --dry-run
-    python manage.py test
+    python manage.py test --settings=config.test_settings
 
 Frontend, from plots/bookit-ui/:
 
@@ -109,3 +109,4 @@ Payment tests should mock Safaricom requests. Never test by initiating a real pa
 ## API documentation
 
 See [docs/API.md](docs/API.md) for route methods, authentication, and request/response examples.
+

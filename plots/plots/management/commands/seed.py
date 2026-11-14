@@ -1,4 +1,4 @@
-import random
+﻿import random
 from datetime import timedelta
 from decimal import Decimal
 
@@ -109,7 +109,7 @@ class Command(BaseCommand):
 
         if not Announcement.objects.exists():
             Announcement.objects.create(
-                title="Welcome to BookIt",
+                title="Welcome to Urban Nest",
                 message="Thanks for staying with us. Reviews are open after your stay.")
 
         self.stdout.write(self.style.SUCCESS(
