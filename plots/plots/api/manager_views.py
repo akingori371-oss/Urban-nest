@@ -15,13 +15,15 @@ from django.utils.dateparse import parse_date
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..manager_permissions import IsManager, IsMainManager
 from ..models import (Announcement, Booking, House, HousePhoto, ManagerInvitation,
                       ManagerProfile, MpesaPayment, PaymentPeriod)
 from .serializers import (BookingSerializer, HousePhotoSerializer,
-                          ManagerAnnouncementSerializer, ManagerHouseSerializer)
+                          ManagerAnnouncementSerializer, ManagerHouseSerializer,
+                          ManagerInvitationSerializer, ManagerPaymentSerializer)
 
 User = get_user_model()
 MAIN_MANAGER_EMAIL = "akingori371@gmail.com"
@@ -151,14 +153,14 @@ def manager_bookings(request):
             if not date:
                 return Response({"detail": f"{key} must be YYYY-MM-DD."}, status=400)
             queryset = queryset.filter(**{"check_in__gte" if key.endswith("from") else "check_in__lte": date})
-    response = paginated(request, queryset, BookingSerializer)
-    if isinstance(response.data, dict):
-        for item in response.data.get("results", []):
-            booking = queryset.filter(pk=item["id"]).first()
-            item["tenant"] = {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email}
-            item["apartment"] = {"id": booking.house_id, "name": booking.house.name}
-            item["payment_status"] = "paid" if (booking.paid if not booking.is_long else not booking.periods.filter(paid=False).exists()) else "outstanding"
-    return response
+    paginator = ManagerPagination()
+    page = paginator.paginate_queryset(queryset, request)
+    results = BookingSerializer(page, many=True).data
+    for item, booking in zip(results, page):
+        item["tenant"] = {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email}
+        item["apartment"] = {"id": booking.house_id, "name": booking.house.name}
+        item["payment_status"] = "paid" if (booking.paid if not booking.is_long else not booking.periods.filter(paid=False).exists()) else "outstanding"
+    return paginator.get_paginated_response(results)
 
 
 @api_view(["GET", "POST"])
@@ -197,7 +199,7 @@ def manager_payments(request):
         queryset = queryset.filter(created_at__date__gte=request.query_params["date_from"])
     if request.query_params.get("date_to"):
         queryset = queryset.filter(created_at__date__lte=request.query_params["date_to"])
-    return paginated(request, queryset, lambda items, many, context=None: __import__("rest_framework").serializers.Serializer())
+    return paginated(request, queryset, ManagerPaymentSerializer)
 
 
 @api_view(["GET", "POST"])
@@ -241,7 +243,7 @@ def manager_tenants(request):
     results = []
     for user in page:
         bookings = Booking.objects.filter(user=user)
-        short_due = bookings.filter(status="confirmed", check_in__gte=timezone.localdate(), paid=False, check_out__lte=models.F("check_in") + timedelta(days=30)).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
+        short_due = sum((b.total_price for b in bookings.filter(status="confirmed", paid=False) if not b.is_long), Decimal("0"))
         period_due = PaymentPeriod.objects.filter(booking__user=user, booking__status="confirmed", paid=False).aggregate(total=Sum("amount"))["total"] or Decimal("0")
         results.append({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active, "bookings_count": bookings.count(), "outstanding_balance": str(short_due + period_due)})
     return paginator.get_paginated_response(results)
@@ -292,7 +294,7 @@ def manager_invitations(request):
             return Response({"detail": "Invitation email could not be sent."}, status=503)
         return Response({"id": invitation.id, "email": invitation.email, "status": invitation.status, "expires_at": invitation.expires_at}, status=201)
     queryset = ManagerInvitation.objects.select_related("invited_by").order_by("-created_at")
-    return paginated(request, queryset, lambda rows, many, context=None: None)
+    return paginated(request, queryset, ManagerInvitationSerializer)
 
 
 @api_view(["DELETE"])
@@ -321,10 +323,10 @@ def manager_remove(request, pk):
 
 
 @api_view(["POST"])
-@permission_classes([IsManager])
+@permission_classes([IsAuthenticated])
 def accept_manager_invitation(request, token):
-    if not request.user.email or not request.user.email_verified if hasattr(request.user, "email_verified") else False:
-        return Response({"detail": "The authenticated account email must be verified."}, status=403)
+    if not request.user.email:
+        return Response({"detail": "The authenticated account needs an email address."}, status=403)
     digest = _token_hash(token)
     with transaction.atomic():
         invitation = get_object_or_404(ManagerInvitation.objects.select_for_update(), token_hash=digest, status="pending")
