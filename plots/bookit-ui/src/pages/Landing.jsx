@@ -1,5 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
-import { useAuth } from "../AuthContext.jsx";
+import { useAuth } from "../auth.js";
 
 const features = [
   { icon: "📅", title: "Search by date", text: "Pick your check-in and check-out dates and see only the houses that are free. No more guessing or phoning around." },

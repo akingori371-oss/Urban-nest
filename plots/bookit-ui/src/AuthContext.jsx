@@ -1,8 +1,7 @@
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
+import { AuthContext } from "./auth.js";
 import { api, saveSession, clearSession, errorText } from "./api.js";
 
-const AuthContext = createContext(null);
-export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
   const [username, setUsername] = useState(localStorage.getItem("username"));
