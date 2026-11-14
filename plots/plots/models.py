@@ -10,6 +10,7 @@ class House(models.Model):
     description = models.TextField(blank=True)
     bedrooms = models.PositiveSmallIntegerField(default=1)
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
+    is_active = models.BooleanField(default=True)
 
     def is_free(self, check_in, check_out):
         return not self.booking_set.filter(
@@ -129,6 +130,8 @@ class Announcement(models.Model):
     title = models.CharField(max_length=150)
     message = models.TextField()
     created_at = models.DateTimeField(default=timezone.now)
+    is_published = models.BooleanField(default=True)
+    recipients = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="targeted_announcements")
 
     class Meta:
         ordering = ["-created_at"]
@@ -233,3 +236,37 @@ class MpesaCallbackEvent(models.Model):
     payload = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+
+
+class HousePhoto(models.Model):
+    house = models.ForeignKey(House, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="houses/%Y/%m/")
+    caption = models.CharField(max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+
+class ManagerProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="manager_profile")
+    is_main = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} ({'main' if self.is_main else 'manager'})"
+
+
+class ManagerInvitation(models.Model):
+    STATUS = [("pending", "Pending"), ("accepted", "Accepted"), ("cancelled", "Cancelled"), ("expired", "Expired")]
+    email = models.EmailField(db_index=True)
+    token_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=10, choices=STATUS, default="pending", db_index=True)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="manager_invitations_sent")
+    is_main_provision = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.email} ({self.status})"
