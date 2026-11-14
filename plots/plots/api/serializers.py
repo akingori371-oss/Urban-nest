@@ -3,7 +3,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 
-from ..models import Booking, House, HousePhoto, PaymentPeriod, Review, Announcement
+from ..models import (Announcement, Booking, House, HousePhoto, ManagerInvitation,
+                      MpesaPayment, PaymentPeriod, Review)
 
 User = get_user_model()
 
@@ -114,3 +115,30 @@ class ManagerAnnouncementSerializer(serializers.ModelSerializer):
         model = Announcement
         fields = ["id", "title", "message", "created_at", "is_published", "recipient_ids"]
         read_only_fields = ["id", "created_at"]
+
+
+class ManagerPaymentSerializer(serializers.ModelSerializer):
+    tenant = serializers.SerializerMethodField()
+    apartment = serializers.SerializerMethodField()
+    booking_id = serializers.IntegerField(read_only=True)
+    period_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = MpesaPayment
+        fields = ["id", "tenant", "apartment", "booking_id", "period_id", "amount", "phone", "receipt", "status", "result_description", "created_at"]
+
+    def get_tenant(self, obj):
+        booking = obj.booking or (obj.period.booking if obj.period_id else None)
+        return {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email} if booking else None
+
+    def get_apartment(self, obj):
+        booking = obj.booking or (obj.period.booking if obj.period_id else None)
+        return {"id": booking.house_id, "name": booking.house.name} if booking else None
+
+
+class ManagerInvitationSerializer(serializers.ModelSerializer):
+    invited_by = serializers.CharField(source="invited_by.username", read_only=True, default=None)
+
+    class Meta:
+        model = ManagerInvitation
+        fields = ["id", "email", "status", "is_main_provision", "created_at", "expires_at", "accepted_at", "invited_by"]
