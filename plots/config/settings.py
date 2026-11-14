@@ -138,6 +138,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Urban Nest <no-reply@localhost>")
+URBAN_NEST_FRONTEND_URL = os.getenv("URBAN_NEST_FRONTEND_URL", "http://localhost:5173")
 
 
 # Email

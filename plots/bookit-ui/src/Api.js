@@ -38,7 +38,7 @@ async function refreshAccess() {
 // Use api("/houses/") for normal calls. Pass { auth: false } for login and register.
 export async function api(path, options = {}) {
   const { auth = true, ...fetchOptions } = options;
-  const headers = { "Content-Type": "application/json", ...(fetchOptions.headers || {}) };
+  const headers = { ...(fetchOptions.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(fetchOptions.headers || {}) };
 
   if (auth && localStorage.getItem("access")) {
     headers.Authorization = `Bearer ${localStorage.getItem("access")}`;
