@@ -1,4 +1,6 @@
 ﻿from datetime import timedelta
+from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 from urllib.parse import urlparse
 import json
@@ -6,13 +8,15 @@ import re
 import hashlib
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from .models import (Announcement, Booking, House, ManagerInvitation,
-                     ManagerProfile, MpesaPayment, PaymentPeriod)
+                     ManagerProfile, MpesaPayment, PaymentPeriod, Review)
 from .api_error_middleware import ApiErrorMiddleware
+from .management.commands.seed_demo_apartments import DEMO_APARTMENTS, marker_for
 
 
 class ApiErrorMiddlewareTests(TestCase):
@@ -32,6 +36,98 @@ class ApiErrorMiddlewareTests(TestCase):
     def test_non_api_exception_is_not_rewritten(self):
         request = RequestFactory().get("/houses/")
         self.assertIsNone(ApiErrorMiddleware(get_response=lambda _request: None).process_exception(request, RuntimeError("page error")))
+
+
+class DemoApartmentSeedTests(TestCase):
+    def setUp(self):
+        self.existing = House.objects.create(
+            name="Existing tenant home",
+            location="Nairobi County - Kilimani",
+            description="A user-created listing.",
+            bedrooms=2,
+            price_per_night="3000.00",
+        )
+
+    def test_seed_creates_exact_records_only_and_is_idempotent(self):
+        preview = StringIO()
+        call_command("seed_demo_apartments", dry_run=True, stdout=preview)
+        self.assertIn("50 would be created; 0 already exist", preview.getvalue())
+        self.assertEqual(House.objects.count(), 1)
+
+        call_command("seed_demo_apartments", stdout=StringIO())
+        call_command("seed_demo_apartments", stdout=StringIO())
+
+        demo_houses = House.objects.filter(description__contains="[[URBAN_NEST_DEMO|")
+        self.assertEqual(len(DEMO_APARTMENTS), 50)
+        self.assertEqual(demo_houses.count(), 50)
+        self.assertEqual(House.objects.count(), 51)
+        self.existing.refresh_from_db()
+        self.assertEqual(self.existing.description, "A user-created listing.")
+        self.assertEqual(Booking.objects.count(), 0)
+        self.assertEqual(Review.objects.count(), 0)
+        self.assertEqual(get_user_model().objects.count(), 0)
+
+        expected_counties = {
+            "Nairobi County": 10,
+            "Kiambu County": 10,
+            "Mombasa County": 10,
+            "Nakuru County": 10,
+            "Machakos County": 10,
+        }
+        for county, expected in expected_counties.items():
+            self.assertEqual(
+                demo_houses.filter(location__startswith=f"{county} -").count(),
+                expected,
+            )
+
+        for apartment in DEMO_APARTMENTS:
+            self.assertTrue(demo_houses.filter(description__startswith=marker_for(apartment)).exists())
+
+    def test_seed_stores_monthly_divided_by_thirty_and_keeps_demo_labels(self):
+        call_command("seed_demo_apartments", stdout=StringIO())
+        bedsitter = House.objects.get(description__startswith="[[URBAN_NEST_DEMO|ID=NBI-04|")
+        self.assertEqual(bedsitter.bedrooms, 0)
+        self.assertEqual(bedsitter.price_per_night, Decimal("400.00"))
+        self.assertIn("MONTHLY=12000|TYPE=Bedsitter|RATING=4.2", bedsitter.description)
+        self.assertIn("Fictional demonstration listing.", bedsitter.description)
+
+    def test_all_demo_listings_are_paginated_searchable_and_have_no_fake_reviews(self):
+        call_command("seed_demo_apartments", stdout=StringIO())
+        user = get_user_model().objects.create_user(username="demo-check", password="not-used")
+        client = APIClient()
+        client.force_authenticate(user)
+
+        pages = [client.get(f"/api/houses/?page={page}") for page in (1, 2, 3)]
+        self.assertTrue(all(response.status_code == 200 for response in pages))
+        self.assertEqual([len(response.data["results"]) for response in pages], [20, 20, 11])
+        self.assertEqual([response.data["count"] for response in pages], [51, 51, 51])
+
+        kiambu = client.get("/api/houses/?search=Kiambu%20County")
+        self.assertEqual(kiambu.data["count"], 10)
+        demo_response = client.get("/api/houses/?search=Greenview%20Residences")
+        listing = demo_response.data["results"][0]
+        self.assertIsNone(listing["avg_rating"])
+        self.assertEqual(listing["review_count"], 0)
+        self.assertEqual(Review.objects.count(), 0)
+
+    def test_demo_studio_and_bedsitter_remain_editable_with_zero_bedrooms(self):
+        call_command("seed_demo_apartments", stdout=StringIO())
+        manager = get_user_model().objects.create_user(username="demo-manager", password="not-used")
+        ManagerProfile.objects.create(user=manager)
+        compact = House.objects.get(description__startswith="[[URBAN_NEST_DEMO|ID=NBI-04|")
+        client = APIClient()
+        client.force_authenticate(manager)
+
+        response = client.patch(
+            f"/api/manager/apartments/{compact.pk}/",
+            {"bedrooms": 0},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        compact.refresh_from_db()
+        self.assertEqual(compact.bedrooms, 0)
+        self.assertTrue(compact.description.startswith("[[URBAN_NEST_DEMO|ID=NBI-04|"))
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
 class UrbanNestAPITests(TestCase):

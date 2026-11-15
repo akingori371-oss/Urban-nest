@@ -108,7 +108,12 @@ class ManagerHouseSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "location", "description", "bedrooms", "price_per_night", "is_active"]
 
     def validate_bedrooms(self, value):
-        if value < 1:
+        is_demo_compact_type = bool(
+            self.instance
+            and self.instance.description.startswith("[[URBAN_NEST_DEMO|")
+            and ("|TYPE=Studio|" in self.instance.description or "|TYPE=Bedsitter|" in self.instance.description)
+        )
+        if value < 1 and not (value == 0 and is_demo_compact_type):
             raise serializers.ValidationError("An apartment must have at least one bedroom.")
         return value
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorText } from "../Api.js";
+import { apartmentPrice, apartmentRatingLabel, apartmentTypeLabel, demoApartmentInfo } from "../apartmentDisplay.js";
 
 export default function Houses() {
   const [params, setParams] = useSearchParams();
@@ -74,16 +75,21 @@ export default function Houses() {
       {!loading && !error && houses.length === 0 && <p className="rounded-xl border border-dashed border-nest-300 p-8 text-center text-muted">No homes match those filters. Try different dates or another area.</p>}
 
       <div className="grid">
-        {houses.map((house) => (
+        {houses.map((house) => {
+          const price = apartmentPrice(house);
+          const demo = demoApartmentInfo(house);
+          return (
           <article className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-soft" key={house.id}>
             <div className="mb-5 grid aspect-[16/9] place-items-center rounded-xl bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-4xl text-nest-600" aria-hidden="true">⌂</div>
-            <p className="text-xs font-bold uppercase tracking-wider text-nest-600">{house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-nest-600">{apartmentTypeLabel(house)}</p>
             <h2 className="mt-1 text-xl font-semibold text-ink"><Link className="text-ink transition hover:text-nest-700" to={"/houses/" + house.id + "?" + params.toString()}>{house.name}</Link></h2>
             <p className="mt-1 text-sm text-muted">{house.location}</p>
-            <p className="mt-3 text-sm text-amber-700">{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " · " + house.review_count + " reviews" : "New to Urban Nest"}</p>
-            <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-5"><p className="text-sm text-muted"><strong className="text-lg text-ink">KES {house.price_per_night}</strong> / night</p><Link className="rounded-full bg-nest-100 px-4 py-2 text-sm font-semibold text-nest-800 transition hover:bg-nest-800 hover:text-white" to={"/houses/" + house.id + "?" + params.toString()}>View home <span aria-hidden="true">→</span></Link></div>
+            {demo && <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-nest-700">Fictional demonstration listing</p>}
+            <p className="mt-3 text-sm text-amber-700">{apartmentRatingLabel(house)}</p>
+            <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-5"><p className="text-sm text-muted"><strong className="text-lg text-ink">KES {price.amount}</strong> / {price.unit}</p><Link className="rounded-full bg-nest-100 px-4 py-2 text-sm font-semibold text-nest-800 transition hover:bg-nest-800 hover:text-white" to={"/houses/" + house.id + "?" + params.toString()}>View home <span aria-hidden="true">→</span></Link></div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       {!loading && !error && pageCount > 1 && (

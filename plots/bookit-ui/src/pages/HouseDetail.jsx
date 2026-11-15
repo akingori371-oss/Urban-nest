@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, errorText } from "../Api.js";
+import { apartmentPrice, apartmentRatingLabel, apartmentTypeLabel, demoApartmentInfo, visibleApartmentDescription } from "../apartmentDisplay.js";
 
 export default function HouseDetail() {
   const { id } = useParams();
@@ -79,6 +80,8 @@ export default function HouseDetail() {
   }
 
   const back = "/houses" + (params.toString() ? "?" + params.toString() : "");
+  const price = house ? apartmentPrice(house) : null;
+  const demo = house ? demoApartmentInfo(house) : null;
 
   return (
     <section>
@@ -89,10 +92,11 @@ export default function HouseDetail() {
         <article className="overflow-hidden rounded-[1.75rem] border border-line bg-white shadow-sm">
           <div className="grid min-h-48 place-items-center bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-6xl text-nest-600 sm:min-h-64" aria-hidden="true">⌂</div>
           <div className="grid gap-5 p-6 sm:p-9 lg:grid-cols-[1fr_320px] lg:gap-10">
-          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">{house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"} · {house.location}</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{house.name}</h1>
-          <p className="mt-5 text-2xl font-semibold text-ink">KES {house.price_per_night}<span className="text-sm font-normal text-muted"> / night</span></p>
-          <p className="mt-5 leading-7 text-muted">{house.description || "No description is available."}</p>
-          <p className="mt-4 text-sm text-amber-700">{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " from " + house.review_count + " reviews" : "A new home on Urban Nest"}</p>
+          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">{apartmentTypeLabel(house)} · {house.location}</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{house.name}</h1>
+          <p className="mt-5 text-2xl font-semibold text-ink">KES {price.amount}<span className="text-sm font-normal text-muted"> / {price.unit}</span></p>
+          {demo && <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-nest-700">Fictional demonstration listing</p>}
+          <p className="mt-5 leading-7 text-muted">{visibleApartmentDescription(house) || "No description is available."}</p>
+          <p className="mt-4 text-sm text-amber-700">{apartmentRatingLabel(house)}</p>
           </div>
 
           <aside className="h-fit rounded-2xl border border-line bg-nest-50/70 p-5">

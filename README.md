@@ -96,6 +96,15 @@ Run the backend verification commands from the repository root. The test setting
 
 Before testing or merging backend changes, confirm `makemigrations --check --dry-run` reports no model changes without migration files, inspect `showmigrations` and `migrate --plan` for pending schema work, and include migration files in version control (`git status --short`). Generate schema changes with `python plots/plots/manage.py makemigrations plots`, review the operations and dependencies, and commit the migration file with its model change. Apply reviewed migrations to the intended PostgreSQL database with `python plots/plots/manage.py migrate` only after checking `DB_NAME` and the planned operations. Do not use `--fake` to work around a schema mismatch.
 
+## Fictional demo apartments
+
+The 50-listing demonstration seed is repeatable, creates only listings with missing stable demo identifiers, and never creates users, bookings, payments, reviews, or photos. Preview it first, then run it only after the required House schema migration is applied:
+
+    python plots/plots/manage.py seed_demo_apartments --dry-run
+    python plots/plots/manage.py seed_demo_apartments
+
+Demo monthly rent is stored as a nightly equivalent (`monthly rent / 30`) for existing booking calculations; the listing UI labels the provided source amount as monthly. Sample ratings are explicitly labeled fictional and kept separate from genuine review averages. No apartment image assets were supplied, so the existing image behavior is unchanged.
+
 Frontend, from plots/bookit-ui/:
 
     npm.cmd test
