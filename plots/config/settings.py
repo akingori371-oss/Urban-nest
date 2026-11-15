@@ -1,7 +1,9 @@
 ﻿
 from pathlib import Path
 import os
+import ipaddress
 from datetime import timedelta
+from urllib.parse import urlsplit
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -173,8 +175,39 @@ MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
 MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL", "")
 MPESA_ENVIRONMENT = os.getenv("MPESA_ENVIRONMENT", "sandbox").strip().lower()
 if MPESA_ENVIRONMENT != "sandbox":
-    raise ValueError("Only the Daraja Sandbox environment is enabled.")
+    raise ImproperlyConfigured("Only the Daraja Sandbox environment is enabled.")
+MPESA_TRANSACTION_TYPE = os.getenv("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline")
+if MPESA_TRANSACTION_TYPE not in {"CustomerPayBillOnline", "CustomerBuyGoodsOnline"}:
+    raise ImproperlyConfigured("MPESA_TRANSACTION_TYPE must be a supported Daraja STK Push type.")
 MPESA_API_BASE_URL = "https://sandbox.safaricom.co.ke"
+
+
+def is_valid_mpesa_callback_url(value):
+    """Accept only the public HTTPS callback endpoint served by this project."""
+    if not value or value != value.strip() or any(character.isspace() for character in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        parsed.port  # Accessing this validates any explicit port.
+        if (parsed.scheme.lower() != "https" or not parsed.netloc or not hostname
+                or parsed.username or parsed.password or parsed.query or parsed.fragment
+                or parsed.path != "/api/mpesa/callback/"):
+            return False
+        hostname = hostname.rstrip(".").lower()
+        if hostname == "localhost" or hostname.endswith((".localhost", ".local")):
+            return False
+        try:
+            if not ipaddress.ip_address(hostname).is_global:
+                return False
+        except ValueError:
+            pass
+        return True
+    except ValueError:
+        return False
+
+
+MPESA_CALLBACK_URL_VALID = is_valid_mpesa_callback_url(MPESA_CALLBACK_URL)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = True

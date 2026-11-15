@@ -84,6 +84,38 @@ In another terminal, from the repository root:
 
 The Vite development server proxies API traffic to Django at http://127.0.0.1:8000.
 
+## Daraja M-Pesa Sandbox
+
+The integration is restricted to Safaricom's Sandbox. Configure these values in the private `plots/.env` file; never paste credentials into chat or commit them:
+
+    MPESA_ENVIRONMENT=sandbox
+    MPESA_CONSUMER_KEY=...
+    MPESA_CONSUMER_SECRET=...
+    MPESA_SHORTCODE=174379
+    MPESA_PASSKEY=...
+    MPESA_CALLBACK_URL=https://your-current-ngrok-host.ngrok-free.dev/api/mpesa/callback/
+    MPESA_TRANSACTION_TYPE=CustomerPayBillOnline
+
+Create a Sandbox app at [Safaricom Daraja](https://developer.safaricom.co.ke/) and enable the Lipa Na M-Pesa Online API to obtain its Consumer Key and Consumer Secret. Use the Sandbox shortcode and passkey shown in Daraja's Sandbox documentation/app configuration (174379 is the standard Sandbox PayBill shortcode). Use `CustomerPayBillOnline` for a PayBill shortcode or `CustomerBuyGoodsOnline` for a Till shortcode. The production environment is deliberately disabled.
+
+Start Django on port 8000, then start the existing ngrok account's tunnel in another terminal:
+
+    ngrok http 8000
+
+Set `MPESA_CALLBACK_URL` to the tunnel's current HTTPS URL plus `/api/mpesa/callback/`, and include the ngrok hostname in `DJANGO_ALLOWED_HOSTS`. The previously used host was `spender-speech-aviator.ngrok-free.dev`; use it only if your active tunnel currently reports that hostname. Do not assume a reserved ngrok hostname is active. Verify reachability after Django and the tunnel are running:
+
+    curl.exe -i https://your-current-ngrok-host.ngrok-free.dev/api/mpesa/callback/
+
+An HTTP 405 response is expected for GET because the callback accepts POST only; a tunnel error or Django host error means the callback is not ready.
+
+Apply migrations before starting the payment test:
+
+    python plots/plots/manage.py migrate
+
+Then start the React app as described above, sign in, book an available apartment, and choose Pay Now. Verify the callback in Django's server output and confirm the payment/booking status and receipt in My stays or the manager payment view. Automated tests mock Daraja and never submit STK Pushes.
+
+Sandbox behavior depends on Safaricom's current test configuration and may not deliver a real PIN prompt to a production handset. The application cannot confirm real-phone prompt delivery until a controlled Sandbox STK request is accepted and observed on the configured test phone; never treat an accepted request as a successful payment.
+
 ## Tests, migrations and production build
 
 Run the backend verification commands from the repository root. The test settings use an isolated in-memory SQLite database; normal application settings continue to use PostgreSQL.
@@ -103,7 +135,7 @@ The 50-listing demonstration seed is repeatable, creates only listings with miss
     python plots/plots/manage.py seed_demo_apartments --dry-run
     python plots/plots/manage.py seed_demo_apartments
 
-Demo monthly rent is stored as a nightly equivalent (`monthly rent / 30`) for existing booking calculations; the listing UI labels the provided source amount as monthly. Sample ratings are explicitly labeled fictional and kept separate from genuine review averages. No apartment image assets were supplied, so the existing image behavior is unchanged.
+Demo apartment prices are whole-number nightly rates stored directly and used by the existing booking calculations. The seed command updates only demo listing prices and their embedded price marker; it preserves other listing details and does not change bookings or payments. Sample ratings are explicitly labeled fictional and kept separate from genuine review averages. No apartment image assets were supplied, so the existing image behavior is unchanged.
 
 Frontend, from plots/bookit-ui/:
 

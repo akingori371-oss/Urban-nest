@@ -171,6 +171,8 @@ class MpesaPayment(models.Model):
         ("pending", "Pending"),
         ("success", "Success"),
         ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+        ("uncertain", "Uncertain outcome"),
         ("review", "Needs review"),
     ]
 
@@ -215,6 +217,10 @@ class MpesaPayment(models.Model):
     receipt = models.CharField(max_length=50, blank=True)
     result_description = models.CharField(max_length=255, blank=True)
     result_code = models.IntegerField(null=True, blank=True)
+    stk_response = models.JSONField(default=dict, blank=True)
+    query_response = models.JSONField(default=dict, blank=True)
+    callback_data = models.JSONField(default=dict, blank=True)
+    last_query_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

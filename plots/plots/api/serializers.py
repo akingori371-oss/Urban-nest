@@ -118,8 +118,10 @@ class ManagerHouseSerializer(serializers.ModelSerializer):
         return value
 
     def validate_price_per_night(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Nightly price must be greater than zero.")
+        if value != value.to_integral_value() or value < 1 or value >= 5000:
+            raise serializers.ValidationError(
+                "Nightly price must be a whole number between KSh 1 and KSh 4,999."
+            )
         return value
 
 

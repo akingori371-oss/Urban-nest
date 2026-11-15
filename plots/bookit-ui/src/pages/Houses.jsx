@@ -87,7 +87,7 @@ export default function Houses() {
             <p className="mt-1 text-sm text-muted">{house.location}</p>
             {demo && <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-nest-700">Fictional demonstration listing</p>}
             <p className="mt-3 text-sm text-amber-700">{apartmentRatingLabel(house)}</p>
-            <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-5"><p className="text-sm text-muted"><strong className="text-lg text-ink">KES {price.amount}</strong> / {price.unit}</p><Link className="rounded-full bg-nest-100 px-4 py-2 text-sm font-semibold text-nest-800 transition hover:bg-nest-800 hover:text-white" to={"/houses/" + house.id + "?" + params.toString()}>View home <span aria-hidden="true">→</span></Link></div>
+            <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-5"><p className="text-sm text-muted"><strong className="text-lg text-ink">KSh {price.amount}</strong> / {price.unit}</p><Link className="rounded-full bg-nest-100 px-4 py-2 text-sm font-semibold text-nest-800 transition hover:bg-nest-800 hover:text-white" to={"/houses/" + house.id + "?" + params.toString()}>View home <span aria-hidden="true">→</span></Link></div>
           </article>
           );
         })}

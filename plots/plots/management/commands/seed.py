@@ -43,9 +43,9 @@ class Command(BaseCommand):
 
         houses = []
         for name, loc, beds, price in [
-            ("Sunset Villa", "Nairobi", 4, "120"), ("Lakeview Cottage", "Naivasha", 2, "75"),
-            ("City Loft", "Nairobi", 1, "50"), ("Garden House", "Karuri", 3, "90"),
-            ("Hilltop Retreat", "Limuru", 5, "150"), ("Cosy Studio", "Thika", 1, "35"),
+            ("Sunset Villa", "Nairobi", 4, "4500"), ("Lakeview Cottage", "Naivasha", 2, "2500"),
+            ("City Loft", "Nairobi", 1, "1750"), ("Garden House", "Karuri", 3, "3200"),
+            ("Hilltop Retreat", "Limuru", 5, "4000"), ("Cosy Studio", "Thika", 1, "800"),
         ]:
             h, _ = House.objects.get_or_create(name=name, defaults=dict(
                 location=loc, bedrooms=beds, price_per_night=Decimal(price),

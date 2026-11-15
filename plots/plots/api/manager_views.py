@@ -74,7 +74,7 @@ def manager_dashboard(request):
         "bookings_confirmed": Booking.objects.filter(status="confirmed").count(),
         "bookings_cancelled": Booking.objects.filter(status="cancelled").count(),
         "payments_success": payments.filter(status="success").count(),
-        "payments_pending_review": payments.filter(status__in=["pending", "review"]).count(),
+        "payments_pending_review": payments.filter(status__in=["pending", "uncertain", "review"]).count(),
         "payments_failed": payments.filter(status="failed").count(),
         "outstanding_balance": str(short_outstanding + long_outstanding),
         "recent_bookings": list(Booking.objects.select_related("house", "user").order_by("-created_at").values("id", "house__name", "user__username", "check_in", "check_out", "status", "total_price", "created_at")[:8]),

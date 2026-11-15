@@ -14,7 +14,16 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    test_command = sys.argv[1:2] == ["test"]
+    explicit_settings = any(
+        argument == "--settings" or argument.startswith("--settings=")
+        for argument in sys.argv[2:]
+    )
+    if test_command and not explicit_settings:
+        # Never route the default test command to the configured development DB.
+        os.environ["DJANGO_SETTINGS_MODULE"] = "config.test_settings"
+    else:
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

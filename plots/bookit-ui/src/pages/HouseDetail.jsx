@@ -94,7 +94,7 @@ export default function HouseDetail() {
           <PhotoCarousel className="rounded-none sm:aspect-[2/1] sm:rounded-none" photos={house.photos} name={house.name} />
           <div className="grid gap-5 p-6 sm:p-9 lg:grid-cols-[1fr_320px] lg:gap-10">
           <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">{apartmentTypeLabel(house)} · {house.location}</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{house.name}</h1>
-          <p className="mt-5 text-2xl font-semibold text-ink">KES {price.amount}<span className="text-sm font-normal text-muted"> / {price.unit}</span></p>
+          <p className="mt-5 text-2xl font-semibold text-ink">KSh {price.amount}<span className="text-sm font-normal text-muted"> / {price.unit}</span></p>
           {demo && <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-nest-700">Fictional demonstration listing</p>}
           <p className="mt-5 leading-7 text-muted">{visibleApartmentDescription(house) || "No description is available."}</p>
           <p className="mt-4 text-sm text-amber-700">{apartmentRatingLabel(house)}</p>

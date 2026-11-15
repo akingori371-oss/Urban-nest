@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, errorText } from "../Api.js";
+import { formatKsh } from "../apartmentDisplay.js";
 import MpesaPay from "./MpesaPay.jsx";
 
 export default function MyBookings() {
@@ -63,7 +64,7 @@ export default function MyBookings() {
             <p className="text-xs font-bold uppercase tracking-wider text-nest-600">{booking.is_long ? "LONG STAY" : "RESERVATION"}</p>
             <h2 className="mt-2 text-xl font-semibold text-ink">{booking.house_name}</h2>
             <p className="mt-2 text-sm text-muted">{booking.check_in} to {booking.check_out} · {booking.nights} night{booking.nights === 1 ? "" : "s"}</p>
-            <p className="mt-4 text-sm text-muted"><strong className="text-lg text-ink">KES {booking.total_price}</strong> · {booking.is_long ? "Long stay" : "Short stay"}</p>
+            <p className="mt-4 text-sm text-muted"><strong className="text-lg text-ink">KSh {formatKsh(booking.total_price)}</strong> · {booking.is_long ? "Long stay" : "Short stay"}</p>
             <p className="mt-3 text-sm text-muted">Status: <strong className="capitalize text-nest-800">{booking.status}</strong>
               {booking.status === "confirmed" && !booking.is_long && (booking.paid ? " · Paid" : " · Unpaid")}
             </p>

@@ -30,6 +30,7 @@ export default function PhotoCarousel({ photos, name, className = "" }) {
   const change = (direction) => setIndex((value) => (value + direction + images.length) % images.length);
   return <div className={`relative aspect-[16/9] overflow-hidden rounded-xl bg-nest-100 ${className}`} aria-label={`${name} photos`}>
     <img className="size-full object-cover" src={current.image} alt={current.caption ? `${name} ${current.caption}` : `${name} property photo`} loading="lazy" />
+    {current.caption?.toLowerCase().includes("temporary low-resolution placeholder") && <span className="absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white">Temporary low-resolution placeholder</span>}
     {images.length > 1 && <>
       <button className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-xl text-white shadow hover:bg-black/75 focus-visible:outline-white" type="button" onClick={() => change(-1)} aria-label={`Previous photo of ${name}`}>‹</button>
       <button className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-xl text-white shadow hover:bg-black/75 focus-visible:outline-white" type="button" onClick={() => change(1)} aria-label={`Next photo of ${name}`}>›</button>
