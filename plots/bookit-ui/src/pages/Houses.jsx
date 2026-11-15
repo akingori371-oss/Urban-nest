@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, errorText } from "../api.js";
+import { api, errorText } from "../Api.js";
 
 export default function Houses() {
   const [params, setParams] = useSearchParams();
@@ -23,7 +23,10 @@ export default function Houses() {
       const response = await api("/houses/?" + query.toString());
       const data = await response.json();
       if (!response.ok) throw new Error(errorText(data));
-      setHouses(data.results || []);
+      if (!data || !Array.isArray(data.results) || !Number.isFinite(data.count)) {
+        throw new Error("The server returned an unexpected apartment list response.");
+      }
+      setHouses(data.results);
       setCount(data.count || 0);
     } catch (requestError) {
       setHouses([]);
@@ -58,35 +61,36 @@ export default function Houses() {
 
   return (
     <section>
-      <h2>Find an apartment</h2>
-      <form className="row" onSubmit={searchHouses}>
-        <label>Check-in <input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
-        <label>Check-out <input type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
-        <label>Search <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, location, details" /></label>
-        <button type="submit">Search</button>
+      <div className="mb-8"><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">EXPLORE URBAN NEST</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Find your next stay</h1><p className="mt-2 text-muted">A good place to land, for as long as you need.</p></div>
+      <form className="mb-9 grid gap-4 rounded-2xl border border-line bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_auto] lg:items-end" onSubmit={searchHouses}>
+        <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-in <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
+        <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-out <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
+        <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Search by name or area <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink placeholder:text-muted/70 focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Neighbourhood, house name…" /></label>
+        <button className="min-h-11 rounded-xl bg-nest-800 px-6 py-2.5 font-semibold text-white transition hover:bg-nest-900" type="submit">Search homes</button>
       </form>
 
-      {loading && <p role="status">Loading apartments...</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-      {!loading && !error && houses.length === 0 && <p>No apartments match your search.</p>}
+      {loading && <p className="rounded-xl bg-white p-6 text-muted" role="status">Finding available homes…</p>}
+      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</p>}
+      {!loading && !error && houses.length === 0 && <p className="rounded-xl border border-dashed border-nest-300 p-8 text-center text-muted">No homes match those filters. Try different dates or another area.</p>}
 
       <div className="grid">
         {houses.map((house) => (
-          <article className="card" key={house.id}>
-            <h3><Link to={"/houses/" + house.id + "?" + params.toString()}>{house.name}</Link></h3>
-            <p>{house.location} · {house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"}</p>
-            <p>{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " (" + house.review_count + " reviews)" : "No reviews yet"}</p>
-            <p><strong>KES {house.price_per_night}</strong> / night</p>
-            <Link className="button-link" to={"/houses/" + house.id + "?" + params.toString()}>View details</Link>
+          <article className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-soft" key={house.id}>
+            <div className="mb-5 grid aspect-[16/9] place-items-center rounded-xl bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-4xl text-nest-600" aria-hidden="true">⌂</div>
+            <p className="text-xs font-bold uppercase tracking-wider text-nest-600">{house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"}</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink"><Link className="text-ink transition hover:text-nest-700" to={"/houses/" + house.id + "?" + params.toString()}>{house.name}</Link></h2>
+            <p className="mt-1 text-sm text-muted">{house.location}</p>
+            <p className="mt-3 text-sm text-amber-700">{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " · " + house.review_count + " reviews" : "New to Urban Nest"}</p>
+            <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-5"><p className="text-sm text-muted"><strong className="text-lg text-ink">KES {house.price_per_night}</strong> / night</p><Link className="rounded-full bg-nest-100 px-4 py-2 text-sm font-semibold text-nest-800 transition hover:bg-nest-800 hover:text-white" to={"/houses/" + house.id + "?" + params.toString()}>View home <span aria-hidden="true">→</span></Link></div>
           </article>
         ))}
       </div>
 
       {!loading && !error && pageCount > 1 && (
-        <nav className="row" aria-label="Apartment pages">
-          <button type="button" onClick={() => goToPage(page - 1)} disabled={page <= 1}>Previous</button>
-          <span>Page {page} of {pageCount} · {count} apartments</span>
-          <button type="button" onClick={() => goToPage(page + 1)} disabled={page >= pageCount}>Next</button>
+        <nav className="mt-8 flex items-center justify-center gap-4" aria-label="Apartment pages">
+          <button className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-nest-100 disabled:opacity-40" type="button" onClick={() => goToPage(page - 1)} disabled={page <= 1}>Previous</button>
+          <span className="text-sm text-muted">Page {page} of {pageCount} · {count} homes</span>
+          <button className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-nest-100 disabled:opacity-40" type="button" onClick={() => goToPage(page + 1)} disabled={page >= pageCount}>Next</button>
         </nav>
       )}
     </section>

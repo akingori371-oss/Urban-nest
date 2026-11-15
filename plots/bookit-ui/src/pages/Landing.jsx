@@ -1,99 +1,36 @@
-﻿import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../auth.js";
 
 const features = [
-  { icon: "ðŸ“…", title: "Search by date", text: "Pick your check-in and check-out dates and see only the houses that are free. No more guessing or phoning around." },
-  { icon: "ðŸ’°", title: "Clear prices", text: "The total is worked out for you from the nightly price and the number of nights, so there are no surprises." },
-  { icon: "ðŸ“²", title: "Pay with M-Pesa", text: "Pay straight from your phone with an M-Pesa prompt, and get a receipt as soon as the payment is confirmed." },
-  { icon: "ðŸ—“ï¸", title: "Staying longer? Pay monthly", text: "Stays over 30 nights get a payment card split into 30-day periods, so you pay month by month instead of all at once." },
-  { icon: "ðŸ”’", title: "Your bookings stay yours", text: "Every booking is tied to your account. Only you can see, pay for or cancel your own bookings." },
-  { icon: "ðŸ“¢", title: "Updates from the owner", text: "Important notices appear on your dashboard when you log in, so you never miss news about your stay." },
+  ["⌕", "Find your dates", "Search by check-in and check-out to see homes that are ready for your stay."],
+  ["◎", "Know the total", "Your nightly rate and trip length come together before you book."],
+  ["↗", "Pay with M-Pesa", "Approve a secure prompt on your phone and keep your receipt close."],
 ];
-
-const steps = [
-  { title: "Create an account", text: "Register with your email in under a minute." },
-  { title: "Find and book a house", text: "Search your dates, pick a free house and confirm the booking." },
-  { title: "Pay with M-Pesa", text: "Enter your phone number, approve the prompt, and you're done." },
-];
+const steps = ["Choose your dates and explore available homes", "Confirm your stay with a clear total", "Pay from your phone and get ready to arrive"];
 
 export default function Landing() {
   const { username } = useAuth();
-
-  // Logged-in users skip the advert and go straight to their dashboard.
   if (username) return <Navigate to="/dashboard" replace />;
-
-  return (
-    <div>
-      {/* Hero */}
-      <section className="rounded-3xl bg-[linear-gradient(135deg,#151a2d_0%,#3730a3_60%,#4f46e5_100%)] px-6 py-16 text-center text-white shadow-xl sm:px-10 sm:py-20">
-        <span className="mb-5 inline-block rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold">
-          House booking made simple
-        </span>
-        <h1 className="mb-4 text-4xl font-bold leading-tight sm:text-5xl">
-          Find a free house.<br />Book it in minutes.
-        </h1>
-        <p className="mx-auto mb-8 max-w-xl text-lg text-indigo-100">
-          Urban Nest shows apartments that are free on your dates, works out the price for you,
-          and lets you pay with M-Pesa. Staying longer than a month? Pay month by month.
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link to="/register" className="inline-block rounded-xl bg-white px-7 py-3 font-bold text-indigo-800 hover:bg-indigo-50 hover:no-underline">
-            Get started free
-          </Link>
-          <Link to="/login" className="inline-block rounded-xl border-2 border-white/70 px-7 py-3 font-bold text-white hover:bg-white/10 hover:no-underline">
-            Log in
-          </Link>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="mt-14">
-        <h2 className="mb-1 text-center text-3xl font-bold">Everything you need to book a stay</h2>
-        <p className="mb-7 text-center text-slate-500">From searching to paying, in one place.</p>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <div className="mb-2 text-3xl">{f.icon}</div>
-              <h3 className="mb-1 text-lg font-bold">{f.title}</h3>
-              <p className="text-slate-600">{f.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="mt-14">
-        <h2 className="mb-1 text-center text-3xl font-bold">How it works</h2>
-        <p className="mb-7 text-center text-slate-500">Three steps from sign-up to keys in hand.</p>
-        <div className="grid gap-5 md:grid-cols-3">
-          {steps.map((s, i) => (
-            <div key={s.title} className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 font-bold text-white">
-                {i + 1}
-              </div>
-              <h3 className="mb-1 text-lg font-bold">{s.title}</h3>
-              <p className="text-slate-600">{s.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Final call to action */}
-      <section className="mt-14 rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
-        <h2 className="mb-1 text-3xl font-bold">Ready to find your next stay?</h2>
-        <p className="mb-6 text-slate-500">Create a free account and start searching today.</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link to="/register" className="inline-block rounded-xl bg-indigo-600 px-7 py-3 font-bold text-white hover:bg-indigo-700 hover:no-underline">
-            Create an account
-          </Link>
-          <Link to="/login" className="inline-block rounded-xl border-2 border-indigo-600 px-7 py-3 font-bold text-indigo-600 hover:bg-indigo-50 hover:no-underline">
-            I already have an account
-          </Link>
-        </div>
-      </section>
-
-      <p className="my-10 text-center text-sm text-slate-500">© Urban Nest · Built with Django and React</p>
-    </div>
-  );
+  return <div className="space-y-20 sm:space-y-28">
+    <section className="relative isolate overflow-hidden rounded-[2rem] bg-nest-900 px-6 py-16 text-white shadow-soft sm:px-12 sm:py-24 lg:px-20">
+      <div className="absolute -right-16 -top-24 -z-10 size-80 rounded-full bg-nest-600/30 blur-3xl" />
+      <div className="absolute -bottom-32 left-1/3 -z-10 size-96 rounded-full bg-emerald-300/10 blur-3xl" />
+      <div className="max-w-3xl">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[.18em] text-nest-200"><span className="size-2 rounded-full bg-emerald-300" /> A better way to stay</span>
+        <h1 className="mt-7 max-w-2xl text-5xl font-semibold leading-[1.04] tracking-[-.05em] text-white sm:text-6xl lg:text-7xl">A place that feels like <span className="text-nest-300">your place.</span></h1>
+        <p className="mt-6 max-w-xl text-base leading-7 text-white/65 sm:text-lg">Find a welcoming home in the city. Browse open dates, see your price upfront, and book with confidence.</p>
+        <div className="mt-9 flex flex-wrap gap-3"><Link to="/register" className="rounded-full bg-nest-200 px-6 py-3.5 text-sm font-bold text-nest-900 transition hover:-translate-y-0.5 hover:bg-white">Find your stay <span aria-hidden="true">→</span></Link><Link to="/login" className="rounded-full border border-white/20 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10">I have an account</Link></div>
+        <div className="mt-14 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/15 pt-6 text-sm text-white/55"><span>Thoughtful city homes</span><span>·</span><span>Simple M-Pesa payments</span><span>·</span><span>Support when you need it</span></div>
+      </div>
+    </section>
+    <section>
+      <div className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">MADE FOR REAL LIFE</p><h2 className="mt-3 max-w-lg text-3xl font-semibold tracking-tight text-ink sm:text-4xl">The details that make booking feel easy.</h2></div><p className="max-w-sm text-sm leading-6 text-muted">From the first search to the last payment, everything you need stays in one calm place.</p></div>
+      <div className="grid gap-4 md:grid-cols-3">{features.map(([icon, title, copy], i) => <article key={title} className="group rounded-card border border-line bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-soft sm:p-8"><span className={`grid size-12 place-items-center rounded-2xl text-xl ${i === 1 ? "bg-amber-50 text-amber-700" : "bg-nest-100 text-nest-700"}`}>{icon}</span><h3 className="mt-7 text-lg font-semibold text-ink">{title}</h3><p className="mt-2 text-sm leading-6 text-muted">{copy}</p></article>)}</div>
+    </section>
+    <section className="grid gap-10 rounded-[2rem] border border-line bg-white p-6 shadow-sm sm:p-10 lg:grid-cols-[.8fr_1.2fr] lg:p-14">
+      <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">THREE SIMPLE STEPS</p><h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink">From searching to settled.</h2><p className="mt-4 max-w-sm text-sm leading-6 text-muted">A smooth booking leaves more room for the reason you came.</p></div>
+      <ol className="divide-y divide-line">{steps.map((step, i) => <li key={step} className="flex gap-5 py-5 first:pt-0 last:pb-0"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-nest-100 text-sm font-bold text-nest-700">0{i + 1}</span><p className="pt-1 text-base font-medium text-ink">{step}</p></li>)}</ol>
+    </section>
+    <footer className="flex flex-col items-center justify-between gap-4 border-t border-line py-6 text-sm text-muted sm:flex-row"><Link to="/" className="font-bold tracking-tight text-nest-900">Urban Nest</Link><span>Thoughtful stays, right where you need them.</span></footer>
+  </div>;
 }
-

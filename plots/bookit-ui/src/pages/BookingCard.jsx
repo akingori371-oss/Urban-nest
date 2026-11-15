@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, errorText } from "../api.js";
+import { api, errorText } from "../Api.js";
 import MpesaPay from "./MpesaPay.jsx";
 
 
@@ -10,15 +10,20 @@ export default function BookingCard() {
   const [message, setMessage] = useState("");
   const [receipts, setReceipts] = useState({});
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await api(`/bookings/${id}/periods/`);
       const data = await res.json();
-      if (res.ok) setPeriods(data);
-      else setError(errorText(data));
+      if (!res.ok) setError(errorText(data));
+      else if (!Array.isArray(data)) setError("The server returned an unexpected payment periods response.");
+      else { setPeriods(data); setError(""); }
     } catch {
       setError("Could not refresh payment periods. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
@@ -39,31 +44,33 @@ export default function BookingCard() {
 
   return (
     <div>
-      <p><Link to="/bookings">â† Back to my bookings</Link></p>
-      <h2>Payment card</h2>
-      <p>
+      <p className="mb-5"><Link className="text-sm font-semibold text-nest-700 hover:text-nest-900" to="/bookings">← Back to my stays</Link></p>
+      <header className="mb-6 rounded-2xl bg-nest-900 p-6 text-white sm:p-8"><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-300">LONG STAY PAYMENTS</p><h1 className="mt-2 text-3xl font-semibold text-white">Payment card</h1>
+      <p className="mt-3 text-sm text-white/70">
         Total KES {total.toFixed(2)} Â· Paid KES {paidTotal.toFixed(2)} Â· Outstanding KES {(total - paidTotal).toFixed(2)}
-      </p>
+      </p></header>
 
-      {message && <p className="success">{message}</p>}
-      {error && <p className="error">{error}</p>}
+      {message && <p className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{message}</p>}
+      {error && <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+      {loading && <p className="py-6 text-muted" role="status">Loading payment periods…</p>}
+      {error && !loading && <button className="mb-4 rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink" onClick={() => void load()}>Try again</button>}
 
-      <div className="grid">
-        {periods.map((p) => (
-          <div className="card" key={p.id}>
-            <h3>Period {p.number}</h3>
-            <p>{p.start} to {p.end}</p>
-            <p><strong>KES {p.amount}</strong></p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {!loading && periods.map((p) => (
+          <div className="rounded-2xl border border-line bg-white p-5 shadow-sm" key={p.id}>
+            <h2 className="font-semibold text-ink">Period {p.number}</h2>
+            <p className="mt-2 text-sm text-muted">{p.start} to {p.end}</p>
+            <p className="mt-3 text-lg font-semibold text-ink">KES {p.amount}</p>
             {p.paid ? (
-              <div><p className="success">Paid</p>{receipts[p.id] && <p>M-Pesa receipt: <strong>{receipts[p.id]}</strong></p>}</div>
+              <div><p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">Paid</p>{receipts[p.id] && <p className="text-sm text-muted">M-Pesa receipt: <strong>{receipts[p.id]}</strong></p>}</div>
             ) : (
-              <div className="row">
+              <div className="mt-3">
                 <MpesaPay periodId={p.id} bookingId={id} amount={p.amount} onPaid={paid} />
               </div>
             )}
           </div>
         ))}
-        {periods.length === 0 && !error && <p>No payment periods. This is a short stay.</p>}
+        {!loading && periods.length === 0 && !error && <p>No payment periods. This is a short stay.</p>}
       </div>
     </div>
   );

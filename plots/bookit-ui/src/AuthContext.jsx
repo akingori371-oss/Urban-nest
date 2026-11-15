@@ -1,7 +1,7 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { AuthContext } from "./auth.js";
 import { useEffect } from "react";
-import { api, saveSession, clearSession, errorText } from "./api.js";
+import { api, saveSession, clearSession, errorText } from "./Api.js";
 
 
 export function AuthProvider({ children }) {

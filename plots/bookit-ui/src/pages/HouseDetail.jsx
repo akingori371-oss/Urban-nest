@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { api, errorText } from "../api.js";
+import { api, errorText } from "../Api.js";
 
 export default function HouseDetail() {
   const { id } = useParams();
@@ -21,6 +21,9 @@ export default function HouseDetail() {
       const response = await api("/houses/" + id + "/" + (query ? "?" + query : ""));
       const data = await response.json();
       if (!response.ok) throw new Error(errorText(data));
+      if (!data || !Number.isInteger(data.id) || typeof data.name !== "string") {
+        throw new Error("The server returned an unexpected apartment details response.");
+      }
       setHouse(data);
     } catch (requestError) {
       setHouse(null);
@@ -79,42 +82,46 @@ export default function HouseDetail() {
 
   return (
     <section>
-      <p><Link to={back}>Back to apartments</Link></p>
-      {loading && <p role="status">Loading apartment...</p>}
-      {error && !house && <p className="error" role="alert">{error}</p>}
+      <p className="mb-6"><Link className="text-sm font-semibold text-nest-700 hover:text-nest-900" to={back}>← Back to homes</Link></p>
+      {loading && <p className="py-12 text-muted" role="status">Loading home…</p>}
+      {error && !house && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</p>}
       {house && (
-        <article className="card">
-          <h2>{house.name}</h2>
-          <p>{house.location}</p>
-          <p>{house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"}</p>
-          <p><strong>KES {house.price_per_night}</strong> / night</p>
-          <p>{house.description || "No description is available."}</p>
-          <p>{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " from " + house.review_count + " reviews" : "No reviews yet"}</p>
+        <article className="overflow-hidden rounded-[1.75rem] border border-line bg-white shadow-sm">
+          <div className="grid min-h-48 place-items-center bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-6xl text-nest-600 sm:min-h-64" aria-hidden="true">⌂</div>
+          <div className="grid gap-5 p-6 sm:p-9 lg:grid-cols-[1fr_320px] lg:gap-10">
+          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">{house.bedrooms} bedroom{house.bedrooms === 1 ? "" : "s"} · {house.location}</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{house.name}</h1>
+          <p className="mt-5 text-2xl font-semibold text-ink">KES {house.price_per_night}<span className="text-sm font-normal text-muted"> / night</span></p>
+          <p className="mt-5 leading-7 text-muted">{house.description || "No description is available."}</p>
+          <p className="mt-4 text-sm text-amber-700">{house.avg_rating ? "★ " + house.avg_rating.toFixed(1) + " from " + house.review_count + " reviews" : "A new home on Urban Nest"}</p>
+          </div>
 
-          <form className="row" onSubmit={updateDates}>
-            <label>Check-in <input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
-            <label>Check-out <input type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
-            <button type="submit">Check availability</button>
+          <aside className="h-fit rounded-2xl border border-line bg-nest-50/70 p-5">
+          <form className="grid gap-3" onSubmit={updateDates}>
+            <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-in <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
+            <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-out <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
+            <button className="rounded-xl border border-nest-300 bg-white px-4 py-2.5 text-sm font-semibold text-nest-800 transition hover:bg-nest-100" type="submit">Check availability</button>
           </form>
-          {house.availability === true && <p className="success">Available for these dates.</p>}
-          {house.availability === false && <p className="error">Unavailable for these dates.</p>}
-          {message && <p className="success" role="status">{message}</p>}
-          {error && house && <p className="error" role="alert">{error}</p>}
-          <button type="button" onClick={createBooking} disabled={booking || loading || house.availability === false}>
+          {house.availability === true && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Available for these dates.</p>}
+          {house.availability === false && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Unavailable for these dates.</p>}
+          {message && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{message}</p>}
+          {error && house && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
+          <button className="mt-3 w-full rounded-xl bg-nest-800 px-4 py-3 font-semibold text-white transition hover:bg-nest-900 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={createBooking} disabled={booking || loading || house.availability === false}>
             {booking ? "Booking..." : "Book this apartment"}
           </button>
+          </aside>
 
           {house.reviews?.length > 0 && (
-            <section>
-              <h3>Guest reviews</h3>
+            <section className="lg:col-span-2">
+              <h2 className="text-xl font-semibold text-ink">Guest reviews</h2>
               {house.reviews.map((review, index) => (
-                <blockquote key={index}>
-                  <strong>{review.rating}/5</strong>
-                  <p>{review.comment || "No written comment."}</p>
+                <blockquote className="mt-3 rounded-xl border border-line bg-nest-50 p-4 text-sm" key={index}>
+                  <strong className="text-amber-700">★ {review.rating}/5</strong>
+                  <p className="mt-2 text-muted">{review.comment || "No written comment."}</p>
                 </blockquote>
               ))}
             </section>
           )}
+          </div>
         </article>
       )}
     </section>

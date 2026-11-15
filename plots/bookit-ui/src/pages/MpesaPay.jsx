@@ -1,5 +1,5 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { api, errorText } from "../api.js";
+import { useEffect, useRef, useState } from "react";
+import { api, errorText } from "../Api.js";
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120000;
@@ -120,19 +120,19 @@ export default function MpesaPay({ periodId, bookingId, amount, onPaid }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
+    <form className="mt-4 grid gap-3" onSubmit={handleSubmit}>
+      <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">
         M-Pesa phone number
-        <input type="tel" inputMode="numeric" autoComplete="tel" placeholder="0712345678"
+        <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink placeholder:text-muted/70 focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100 disabled:bg-nest-50" type="tel" inputMode="numeric" autoComplete="tel" placeholder="0712345678"
           value={phone} onChange={(event) => setPhone(event.target.value)}
           disabled={submitting || pending} required />
       </label>
-      <button type="submit" disabled={submitting || pending}>
+      <button className="rounded-xl bg-nest-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-nest-900 disabled:cursor-wait disabled:opacity-60" type="submit" disabled={submitting || pending}>
         {submitting ? "Sending request..." : pending ? "Awaiting confirmation..." : "Pay KES " + amount}
       </button>
-      {statusMessage && <p className="success" role="status" aria-live="polite">{statusMessage}</p>}
-      {receipt && <p className="success">M-Pesa receipt: <strong>{receipt}</strong></p>}
-      {error && <p className="error" role="alert">{error}</p>}
+      {statusMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status" aria-live="polite">{statusMessage}</p>}
+      {receipt && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">M-Pesa receipt: <strong>{receipt}</strong></p>}
+      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
     </form>
   );
 }

@@ -28,9 +28,8 @@ The project gives guests a single place to discover apartments, check date avail
 ## Project structure
 
     plots/
-      manage.py
       config/                  Django settings, URL routing, ASGI and WSGI
-      plots/                   Django application and migrations
+      plots/                   Django application, management command and migrations
         api/                   API views, serializers and URL routes
         management/            Management commands
       bookit-ui/               React and Vite application
@@ -46,7 +45,7 @@ The project gives guests a single place to discover apartments, check date avail
 
 ## PostgreSQL setup
 
-The backend reads configuration from plots/.env. Copy plots/.env.example to plots/.env and set a private database username and password. The SQLite database file is retained as an archive; it is not automatically imported into PostgreSQL.
+The backend reads configuration from `plots/.env`; keep database credentials private and do not commit this file. The SQLite database file is retained as an archive; it is not imported into PostgreSQL.
 
 Install PostgreSQL and start its service. Connect as a PostgreSQL administrator and create a database and a least-privilege application role. For example, in psql:
 
@@ -61,47 +60,45 @@ Set DB_NAME, DB_USER, DB_PASSWORD, DB_HOST and DB_PORT in plots/.env to match th
 From the repository root, create and activate a virtual environment, then install dependencies:
 
     py -3.13 -m venv myenv
-    .myenvScriptsActivate.ps1
-    pip install -r plotsequirements.txt
+    .\myenv\Scripts\Activate.ps1
+    pip install -r plots/requirements.txt
 
-On macOS or Linux, activate with source myenv/bin/activate.
+On macOS or Linux, activate with `source myenv/bin/activate`.
 
-Copy the example environment file and configure its values:
+Configure `plots/.env` with `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=true`, `DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1`, and the PostgreSQL `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST` and `DB_PORT` values. Keep the file private. `DB_NAME` should be `urban_nest` for the local application database.
 
-    Copy-Item plots.env.example plots.env
+For a new PostgreSQL database, initialize the schema and create an administrator from the repository root:
 
-Set DJANGO_SECRET_KEY to a newly generated private key. Set DJANGO_DEBUG=true and DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 for local development. Configure the DB_* settings above. Daraja settings can remain blank until Sandbox is configured; MPESA_ENVIRONMENT must remain sandbox.
-
-For a new PostgreSQL database, initialize the schema and create an administrator:
-
-    Set-Location plots
-    python manage.py check
-    python manage.py migrate
-    python manage.py createsuperuser
-    python manage.py runserver
-
-Migration commands are shown for your local setup. No database migration or data transfer is performed by this project documentation.
+    python plots/plots/manage.py check
+    python plots/plots/manage.py migrate
+    python plots/plots/manage.py createsuperuser
+    python plots/plots/manage.py runserver
 
 ## Frontend setup
 
-In another terminal:
+In another terminal, from the repository root:
 
-    Set-Location plotsookit-ui
+    Set-Location plots/bookit-ui
     npm ci
     npm run dev
 
 The Vite development server proxies API traffic to Django at http://127.0.0.1:8000.
 
-## Tests and production build
+## Tests, migrations and production build
 
-Backend, from plots/ (test settings use an isolated in-memory SQLite database):
+Run the backend verification commands from the repository root. The test settings use an isolated in-memory SQLite database; normal application settings continue to use PostgreSQL.
 
-    python manage.py check
-    python manage.py makemigrations --check --dry-run
-    python manage.py test --settings=config.test_settings
+    python plots/plots/manage.py check
+    python plots/plots/manage.py makemigrations --check --dry-run
+    python plots/plots/manage.py showmigrations plots
+    python plots/plots/manage.py migrate --plan
+    python plots/plots/manage.py test plots --settings=config.test_settings
+
+Before testing or merging backend changes, confirm `makemigrations --check --dry-run` reports no model changes without migration files, inspect `showmigrations` and `migrate --plan` for pending schema work, and include migration files in version control (`git status --short`). Generate schema changes with `python plots/plots/manage.py makemigrations plots`, review the operations and dependencies, and commit the migration file with its model change. Apply reviewed migrations to the intended PostgreSQL database with `python plots/plots/manage.py migrate` only after checking `DB_NAME` and the planned operations. Do not use `--fake` to work around a schema mismatch.
 
 Frontend, from plots/bookit-ui/:
 
+    npm.cmd test
     npm.cmd run lint
     npm.cmd run build
 

@@ -1,16 +1,37 @@
 ﻿from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlparse
+import json
 import re
 import hashlib
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from .models import (Announcement, Booking, House, ManagerInvitation,
                      ManagerProfile, MpesaPayment, PaymentPeriod)
+from .api_error_middleware import ApiErrorMiddleware
+
+
+class ApiErrorMiddlewareTests(TestCase):
+    def test_api_exception_returns_generic_json_and_logs_exception(self):
+        request = RequestFactory().get("/api/houses/?page=1")
+        error = RuntimeError("database password and SQL must not be returned")
+
+        with self.assertLogs("django.request", level="ERROR") as captured:
+            response = ApiErrorMiddleware(get_response=lambda _request: None).process_exception(request, error)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertEqual(json.loads(response.content), {"detail": "An unexpected server error occurred. Please try again later."})
+        self.assertIn("RuntimeError: database password and SQL must not be returned", captured.output[0])
+        self.assertNotIn("database password", response.content.decode())
+
+    def test_non_api_exception_is_not_rewritten(self):
+        request = RequestFactory().get("/houses/")
+        self.assertIsNone(ApiErrorMiddleware(get_response=lambda _request: None).process_exception(request, RuntimeError("page error")))
 
 @override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
 class UrbanNestAPITests(TestCase):
