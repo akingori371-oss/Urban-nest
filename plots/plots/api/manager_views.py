@@ -1,13 +1,12 @@
 import hashlib
 import secrets
 from datetime import timedelta
-from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -18,11 +17,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..manager_permissions import IsManager, IsMainManager
-from ..models import (Announcement, Booking, House, HousePhoto, ManagerInvitation,
-                      ManagerProfile, MpesaPayment, PaymentPeriod)
+from ..models import (Announcement, Booking, BookingNotification, House, HousePhoto, ManagerInvitation,
+                      ManagerProfile)
+from ..booking_notifications import create_decision_notification, mark_manager_request_read, send_booking_email
 from .serializers import (BookingSerializer, HousePhotoSerializer,
                           ManagerAnnouncementSerializer, ManagerHouseSerializer,
-                          ManagerInvitationSerializer, ManagerPaymentSerializer)
+                          ManagerInvitationSerializer)
 
 User = get_user_model()
 MAIN_MANAGER_EMAIL = "akingori371@gmail.com"
@@ -59,10 +59,6 @@ def manager_dashboard(request):
     active_houses = House.objects.filter(is_active=True)
     occupied_ids = Booking.objects.filter(status="confirmed", check_in__lte=today,
                                           check_out__gt=today).values("house_id").distinct()
-    payments = MpesaPayment.objects.all()
-    long_outstanding = PaymentPeriod.objects.filter(booking__status="confirmed", paid=False).aggregate(total=Sum("amount"))["total"] or Decimal("0")
-    short_outstanding = Booking.objects.filter(status="confirmed", paid=False,
-        check_out__lte=F("check_in") + timedelta(days=30)).aggregate(total=Sum("total_price"))["total"] or Decimal("0")
     tenants = User.objects.filter(manager_profile__isnull=True, is_superuser=False)
     return Response({
         "apartments_total": House.objects.count(),
@@ -72,13 +68,12 @@ def manager_dashboard(request):
         "bookings_total": Booking.objects.count(),
         "bookings_pending": Booking.objects.filter(status="pending").count(),
         "bookings_confirmed": Booking.objects.filter(status="confirmed").count(),
+        "bookings_rejected": Booking.objects.filter(status="rejected").count(),
         "bookings_cancelled": Booking.objects.filter(status="cancelled").count(),
-        "payments_success": payments.filter(status="success").count(),
-        "payments_pending_review": payments.filter(status__in=["pending", "uncertain", "review"]).count(),
-        "payments_failed": payments.filter(status="failed").count(),
-        "outstanding_balance": str(short_outstanding + long_outstanding),
-        "recent_bookings": list(Booking.objects.select_related("house", "user").order_by("-created_at").values("id", "house__name", "user__username", "check_in", "check_out", "status", "total_price", "created_at")[:8]),
-        "recent_payments": list(payments.select_related("booking__house", "booking__user", "period__booking__house", "period__booking__user").order_by("-created_at").values("id", "status", "amount", "phone", "receipt", "created_at", "booking__house__name", "period__booking__house__name")[:8]),
+        "unread_booking_requests": BookingNotification.objects.filter(
+            user=request.user, kind="manager_booking_request", read_at__isnull=True).count(),
+        "recent_bookings": list(Booking.objects.select_related("house", "user").order_by("-created_at").values(
+            "id", "house__name", "user__username", "check_in", "check_out", "status", "total_price", "created_at")[:8]),
         "recent_tenants": list(tenants.order_by("-date_joined").values("id", "username", "email", "date_joined")[:8]),
         "recent_announcements": list(Announcement.objects.order_by("-created_at").values("id", "title", "is_published", "created_at")[:8]),
     })
@@ -112,7 +107,7 @@ def manager_house_detail(request, pk):
         data["bookings"] = BookingSerializer(house.booking_set.select_related("user").order_by("-created_at")[:20], many=True).data
         return Response(data)
     if request.method == "DELETE":
-        # Preserve booking/payment history by deactivating instead of deleting.
+        # Preserve booking history by deactivating instead of deleting.
         house.is_active = False
         house.save(update_fields=["is_active"])
         return Response({"detail": "Apartment deactivated."})
@@ -164,72 +159,80 @@ def manager_house_photo_detail(request, pk, photo_pk):
 @api_view(["GET"])
 @permission_classes([IsManager])
 def manager_bookings(request):
-    queryset = Booking.objects.select_related("house", "user").prefetch_related("periods").order_by("-created_at")
+    queryset = Booking.objects.select_related("house", "user").order_by("-created_at")
     search = request.query_params.get("search", "").strip()
     if search:
-        queryset = queryset.filter(Q(user__username__icontains=search) | Q(user__email__icontains=search) | Q(house__name__icontains=search) | Q(pk__icontains=search))
+        queryset = queryset.filter(Q(user__username__icontains=search) | Q(user__email__icontains=search)
+                                   | Q(house__name__icontains=search) | Q(pk__icontains=search))
     for key, field in (("status", "status"), ("apartment", "house_id"), ("tenant", "user_id")):
         if request.query_params.get(key):
             queryset = queryset.filter(**{field: request.query_params[key]})
-    for key in ("check_in_from", "check_in_to"):
-        if request.query_params.get(key):
-            date = parse_date(request.query_params[key])
-            if not date:
-                return Response({"detail": f"{key} must be YYYY-MM-DD."}, status=400)
-            queryset = queryset.filter(**{"check_in__gte" if key.endswith("from") else "check_in__lte": date})
     paginator = ManagerPagination()
     page = paginator.paginate_queryset(queryset, request)
     results = BookingSerializer(page, many=True).data
+    read_booking_ids = set(BookingNotification.objects.filter(
+        user=request.user, kind="manager_booking_request", read_at__isnull=False,
+        booking_id__in=[booking.pk for booking in page],
+    ).values_list("booking_id", flat=True))
     for item, booking in zip(results, page):
-        item["tenant"] = {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email}
+        item["tenant"] = {"id": booking.user_id, "username": booking.user.username,
+                          "email": booking.user.email}
         item["apartment"] = {"id": booking.house_id, "name": booking.house.name}
-        item["payment_status"] = "paid" if (booking.paid if not booking.is_long else all(period.paid for period in booking.periods.all())) else "outstanding"
+        item["unread"] = booking.pk not in read_booking_ids
     return paginator.get_paginated_response(results)
-
-
-@api_view(["GET", "POST"])
-@permission_classes([IsManager])
-def manager_booking_detail(request, pk):
-    booking = get_object_or_404(Booking.objects.select_related("house", "user").prefetch_related("periods"), pk=pk)
-    if request.method == "GET":
-        data = BookingSerializer(booking).data
-        data.update({"tenant": {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email},
-                    "apartment": {"id": booking.house_id, "name": booking.house.name, "location": booking.house.location},
-                    "periods": list(booking.periods.values("id", "number", "start", "end", "amount", "paid")),
-                    "payments": list(MpesaPayment.objects.filter(Q(booking=booking) | Q(period__booking=booking)).values("id", "status", "amount", "phone", "receipt", "created_at"))})
-        return Response(data)
-    if request.data.get("status") != "cancelled" or booking.status != "confirmed":
-        return Response({"detail": "Only confirmed bookings can be cancelled."}, status=400)
-    with transaction.atomic():
-        booking.status = "cancelled"
-        booking.save(update_fields=["status"])
-    return Response(BookingSerializer(booking).data)
 
 
 @api_view(["GET"])
 @permission_classes([IsManager])
-def manager_payments(request):
-    queryset = MpesaPayment.objects.select_related("booking__house", "booking__user", "period__booking__house", "period__booking__user").order_by("-created_at")
-    search = request.query_params.get("search", "").strip()
-    if search:
-        queryset = queryset.filter(Q(phone__icontains=search) | Q(receipt__icontains=search) | Q(booking__user__username__icontains=search) | Q(booking__user__email__icontains=search) | Q(period__booking__user__username__icontains=search) | Q(period__booking__user__email__icontains=search))
-    if request.query_params.get("status"):
-        queryset = queryset.filter(status=request.query_params["status"])
-    if request.query_params.get("tenant"):
-        queryset = queryset.filter(Q(booking__user_id=request.query_params["tenant"]) | Q(period__booking__user_id=request.query_params["tenant"]))
-    if request.query_params.get("apartment"):
-        queryset = queryset.filter(Q(booking__house_id=request.query_params["apartment"]) | Q(period__booking__house_id=request.query_params["apartment"]))
-    if request.query_params.get("date_from"):
-        date_from = parse_date(request.query_params["date_from"])
-        if not date_from:
-            return Response({"detail": "date_from must be YYYY-MM-DD."}, status=400)
-        queryset = queryset.filter(created_at__date__gte=date_from)
-    if request.query_params.get("date_to"):
-        date_to = parse_date(request.query_params["date_to"])
-        if not date_to:
-            return Response({"detail": "date_to must be YYYY-MM-DD."}, status=400)
-        queryset = queryset.filter(created_at__date__lte=date_to)
-    return paginated(request, queryset, ManagerPaymentSerializer)
+def manager_booking_unread_count(request):
+    count = BookingNotification.objects.filter(
+        user=request.user, kind="manager_booking_request", read_at__isnull=True).count()
+    return Response({"unread_count": count})
+
+
+@api_view(["GET"])
+@permission_classes([IsManager])
+def manager_booking_detail(request, pk):
+    booking = get_object_or_404(Booking.objects.select_related("house", "user"), pk=pk)
+    mark_manager_request_read(request.user, booking)
+    data = BookingSerializer(booking).data
+    data.update({"tenant": {"id": booking.user_id, "username": booking.user.username,
+                            "email": booking.user.email},
+                 "apartment": {"id": booking.house_id, "name": booking.house.name,
+                               "location": booking.house.location},
+                 "unread": False})
+    return Response(data)
+
+
+def decide_booking(request, pk, decision):
+    with transaction.atomic():
+        candidate = get_object_or_404(Booking.objects.only("house_id"), pk=pk)
+        House.objects.select_for_update().get(pk=candidate.house_id)
+        booking = get_object_or_404(Booking.objects.select_for_update().select_related("house", "user"), pk=pk)
+        if booking.user_id == request.user.pk:
+            return Response({"detail": "You cannot review your own booking request."}, status=403)
+        if booking.status != "pending":
+            return Response({"detail": "Only pending booking requests can be reviewed."}, status=409)
+        if decision == "confirmed" and not booking.house.is_free(booking.check_in, booking.check_out):
+            return Response({"detail": "These dates have since been reserved. The request remains pending."}, status=409)
+        booking.status = decision
+        booking.save(update_fields=["status"])
+        mark_manager_request_read(request.user, booking)
+        create_decision_notification(booking)
+    send_booking_email(booking, "decision")
+    return Response(BookingSerializer(booking).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsManager])
+def manager_booking_approve(request, pk):
+    return decide_booking(request, pk, "confirmed")
+
+
+@api_view(["POST"])
+@permission_classes([IsManager])
+def manager_booking_reject(request, pk):
+    return decide_booking(request, pk, "rejected")
 
 
 @api_view(["GET", "POST"])
@@ -271,25 +274,11 @@ def manager_tenants(request):
     paginator = ManagerPagination()
     page = paginator.paginate_queryset(queryset, request)
     user_ids = [user.pk for user in page]
-    booking_totals = {
-        row["user_id"]: row
-        for row in Booking.objects.filter(user_id__in=user_ids).values("user_id").annotate(
-            total=Count("id"),
-            short_due=Sum("total_price", filter=Q(status="confirmed", paid=False,
-                check_out__lte=F("check_in") + timedelta(days=30))),
-        )
-    }
-    period_totals = {
-        row["booking__user_id"]: row["total"]
-        for row in PaymentPeriod.objects.filter(booking__user_id__in=user_ids,
-            booking__status="confirmed", paid=False).values("booking__user_id").annotate(total=Sum("amount"))
-    }
-    results = []
-    for user in page:
-        booking_summary = booking_totals.get(user.pk, {})
-        short_due = booking_summary.get("short_due") or Decimal("0")
-        period_due = period_totals.get(user.pk) or Decimal("0")
-        results.append({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active, "bookings_count": booking_summary.get("total", 0), "outstanding_balance": str(short_due + period_due)})
+    booking_totals = {row["user_id"]: row["total"] for row in Booking.objects.filter(
+        user_id__in=user_ids).values("user_id").annotate(total=Count("id"))}
+    results = [{"id": user.id, "username": user.username, "email": user.email,
+                "date_joined": user.date_joined, "is_active": user.is_active,
+                "bookings_count": booking_totals.get(user.pk, 0)} for user in page]
     return paginator.get_paginated_response(results)
 
 
@@ -303,10 +292,9 @@ def manager_tenant_detail(request, pk):
         user.is_active = request.data["is_active"]
         user.save(update_fields=["is_active"])
     bookings = Booking.objects.filter(user=user).select_related("house").order_by("-created_at")
-    payments = MpesaPayment.objects.filter(Q(booking__user=user) | Q(period__booking__user=user)).order_by("-created_at")
-    return Response({"id": user.id, "username": user.username, "email": user.email, "date_joined": user.date_joined, "is_active": user.is_active,
-                     "bookings": list(bookings.values("id", "house__name", "check_in", "check_out", "total_price", "status", "paid")),
-                     "payments": list(payments.values("id", "status", "amount", "phone", "receipt", "created_at"))})
+    return Response({"id": user.id, "username": user.username, "email": user.email,
+                     "date_joined": user.date_joined, "is_active": user.is_active,
+                     "bookings": list(bookings.values("id", "house__name", "check_in", "check_out", "total_price", "status"))})
 
 
 def _token_hash(token):
@@ -316,14 +304,16 @@ def _token_hash(token):
 def _send_invitation(invitation, token):
     base = getattr(settings, "URBAN_NEST_FRONTEND_URL", "http://localhost:5173").rstrip("/")
     link = f"{base}/manager/invitations/accept/{token}"
-    send_mail("Urban Nest manager invitation", f"Accept your manager invitation: {link}\nThis invitation expires in 7 days.", settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False)
+    delivered = send_mail("Urban Nest manager invitation", f"Accept your manager invitation: {link}\nThis invitation expires in 7 days.", settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False)
+    if delivered != 1:
+        raise RuntimeError("Email backend did not confirm delivery.")
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsMainManager])
 def manager_invitations(request):
     if request.method == "POST":
-        mail_backend = settings.MAILERS.get("default", {}).get("BACKEND", "")
+        mail_backend = settings.EMAIL_BACKEND
         if mail_backend.endswith("console.EmailBackend"):
             return Response({"detail": "Manager invitations are unavailable until a delivery email backend is configured."}, status=503)
         email = (request.data.get("email") or "").strip().lower()

@@ -6,32 +6,20 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from plots.models import (House, Booking, PaymentPeriod, Review,
-                          Announcement, Favorite, LoginEvent)
+from plots.models import (House, Booking, Review, Announcement, Favorite, LoginEvent)
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Generate demo guests, apartments, bookings, payments, reviews and logins"
+    help = "Generate demo guests, apartments, bookings, reviews and logins"
 
     def make_booking(self, user, house, cin, cout, status="confirmed", created_at=None):
-        today = timezone.localdate()
-        b = Booking.objects.create(
+        return Booking.objects.create(
             user=user, house=house, check_in=cin, check_out=cout, status=status,
             total_price=(cout - cin).days * house.price_per_night,
             created_at=created_at or timezone.now(),
         )
-        if b.is_long:
-            b.create_periods()
-            for p in b.periods.all():
-                if p.end <= today:                      # finished periods are paid
-                    p.paid, p.paid_at = True, timezone.now()
-                    p.save()
-        elif cout <= today and status == "confirmed":   # finished short stays are paid
-            b.paid, b.paid_at = True, timezone.now()
-            b.save()
-        return b
 
     def handle(self, *args, **opts):
         now = timezone.now()
@@ -58,13 +46,13 @@ class Command(BaseCommand):
             u.date_joined = now - d(days=random.randint(1, 30))
             u.save()
             users.append(u)
-        demo = users[0]   # guest1 gets one booking for every review/payment case
+        demo = users[0]
 
         # ---- Demo bookings for guest1 (cover every branch of the rules) ----
         self.make_booking(demo, houses[0], today - d(days=10), today - d(days=5))    # finished short: can review
         self.make_booking(demo, houses[1], today - d(days=2), today + d(days=3))     # ongoing short: cannot review
-        self.make_booking(demo, houses[2], today - d(days=35), today + d(days=55))   # long, 35 days in: period 1 reviewable
-        self.make_booking(demo, houses[3], today - d(days=20), today + d(days=70))   # long, 20 days in: nothing yet
+        self.make_booking(demo, houses[2], today - d(days=35), today + d(days=55))
+        self.make_booking(demo, houses[3], today - d(days=20), today + d(days=70))
 
         # ---- Random history for the other guests ----
         made = 0
@@ -87,13 +75,7 @@ class Command(BaseCommand):
         # ---- Reviews (skip guest1 so the demo buttons still work) ----
         comments = ["Great place!", "Clean and quiet.", "Good value.", "Would stay again.", ""]
         for b in Booking.objects.filter(status="confirmed").exclude(user=demo):
-            if b.is_long:
-                for p in b.periods.filter(paid=True):
-                    if p.end <= today and random.random() < 0.6:
-                        Review.objects.create(user=b.user, house=b.house, booking=b, period=p,
-                                              rating=random.choice([3, 4, 4, 5, 5]),
-                                              comment=random.choice(comments))
-            elif b.check_out <= today and random.random() < 0.6:
+            if b.check_out <= today and random.random() < 0.6:
                 Review.objects.create(user=b.user, house=b.house, booking=b,
                                       rating=random.choice([3, 4, 4, 5, 5]),
                                       comment=random.choice(comments))

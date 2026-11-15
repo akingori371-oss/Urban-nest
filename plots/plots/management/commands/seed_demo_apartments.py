@@ -174,5 +174,5 @@ class Command(BaseCommand):
 
         self.stdout.write(
             "Included 50 supplied sample ratings as explicitly fictional demo metadata. "
-            "No customer reviews, users, bookings, payments, or photos were created."
+            "No customer reviews, users, bookings, or photos were created."
         )

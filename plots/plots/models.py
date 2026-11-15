@@ -1,6 +1,5 @@
-from datetime import timedelta
 from django.conf import settings
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 
 
@@ -22,15 +21,16 @@ class House(models.Model):
 
 
 class Booking(models.Model):
-    STATUS = [("confirmed", "Confirmed"), ("cancelled", "Cancelled")]
+    STATUS = [("pending", "Pending approval"), ("confirmed", "Confirmed"),
+              ("rejected", "Rejected"), ("cancelled", "Cancelled")]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     house = models.ForeignKey(House, on_delete=models.PROTECT)
     check_in = models.DateField()
     check_out = models.DateField()
+    contact_number = models.CharField(max_length=30, blank=True)
+    guest_count = models.PositiveSmallIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    status = models.CharField(max_length=10, choices=STATUS, default="confirmed", db_index=True)
-    paid = models.BooleanField(default=False)          # used for short stays only
-    paid_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS, default="pending", db_index=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     @property
@@ -38,92 +38,28 @@ class Booking(models.Model):
         return (self.check_out - self.check_in).days
 
     @property
-    def is_long(self):
-        return self.nights > 30
-
-    @property
-    def unpaid_count(self):
-        return self.periods.filter(paid=False).count()
-
-    @property
-    def has_review(self):
-        return self.reviews.filter(period__isnull=True).exists()
-
-    @property
-    def can_review(self):
-        # short stays: unlocks at check-out
-        return (not self.is_long and self.status == "confirmed"
-                and self.check_out <= timezone.localdate() and not self.has_review)
-
-    def create_periods(self):
-        """Create 30-day payment periods idempotently for long stays."""
-        if not self.is_long:
-            return
-        start, number = self.check_in, 1
-        with transaction.atomic():
-            booking = Booking.objects.select_for_update().get(pk=self.pk)
-            while start < booking.check_out:
-                end = min(start + timedelta(days=30), booking.check_out)
-                PaymentPeriod.objects.get_or_create(
-                    booking=booking,
-                    number=number,
-                    defaults={
-                        "start": start,
-                        "end": end,
-                        "amount": (end - start).days * booking.house.price_per_night,
-                    },
-                )
-                start, number = end, number + 1
-
-    def __str__(self):
-        return f"{self.user} - {self.house} ({self.check_in} to {self.check_out})"
-
-
-class PaymentPeriod(models.Model):
-    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="periods")
-    number = models.PositiveSmallIntegerField()
-    start = models.DateField()
-    end = models.DateField()
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    paid = models.BooleanField(default=False)
-    paid_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ["number"]
-        constraints = [
-            models.UniqueConstraint(fields=["booking", "number"], name="unique_booking_period_number"),
-        ]
-
-    @property
     def has_review(self):
         return self.reviews.exists()
 
     @property
     def can_review(self):
-        # long stays: period must be over AND paid
-        return self.paid and self.end <= timezone.localdate() and not self.has_review
+        return (self.status == "confirmed" and self.check_out <= timezone.localdate()
+                and not self.has_review)
 
     def __str__(self):
-        return f"{self.booking} - period {self.number}"
+        return f"{self.user} - {self.house} ({self.check_in} to {self.check_out})"
 
 
 class Review(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     house = models.ForeignKey(House, on_delete=models.CASCADE, related_name="reviews")
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="reviews")
-    period = models.ForeignKey(PaymentPeriod, on_delete=models.CASCADE, null=True, blank=True,
-                               related_name="reviews")   # empty for short stays
     rating = models.PositiveSmallIntegerField(choices=[(i, f"{i} stars") for i in range(1, 6)])
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["booking"], condition=models.Q(period__isnull=True),
-                                    name="one_review_per_short_booking"),
-            models.UniqueConstraint(fields=["period"], condition=models.Q(period__isnull=False),
-                                    name="one_review_per_period"),
-        ]
+        constraints = [models.UniqueConstraint(fields=["booking"], name="one_review_per_booking")]
 
 
 class Announcement(models.Model):
@@ -166,83 +102,21 @@ def record_login(sender, request, user, **kwargs):
         pass  # analytics must never block a login
 
 
-class MpesaPayment(models.Model):
-    STATUS = [
-        ("pending", "Pending"),
-        ("success", "Success"),
-        ("failed", "Failed"),
-        ("cancelled", "Cancelled"),
-        ("uncertain", "Uncertain outcome"),
-        ("review", "Needs review"),
-    ]
-
-    booking = models.ForeignKey(
-        Booking,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="mpesa_payments"
-    )
-
-    period = models.ForeignKey(
-        PaymentPeriod,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="mpesa_payments"
-    )
-
-    checkout_request_id = models.CharField(
-        max_length=100,
-        unique=True,
-        null=True,
-        blank=True,
-    )
-
-    merchant_request_id = models.CharField(
-        max_length=100,
-        blank=True
-    )
-
-    phone = models.CharField(max_length=15)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-    status = models.CharField(
-        max_length=10,
-        choices=STATUS,
-        default="pending",
-        db_index=True,
-    )
-
-    receipt = models.CharField(max_length=50, blank=True)
-    result_description = models.CharField(max_length=255, blank=True)
-    result_code = models.IntegerField(null=True, blank=True)
-    stk_response = models.JSONField(default=dict, blank=True)
-    query_response = models.JSONField(default=dict, blank=True)
-    callback_data = models.JSONField(default=dict, blank=True)
-    last_query_at = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
+class BookingNotification(models.Model):
+    KIND = [("booking_received", "Booking received"),
+            ("booking_decision", "Booking decision"),
+            ("manager_booking_request", "Manager booking request")]
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="booking_notifications")
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="notifications")
+    kind = models.CharField(max_length=32, choices=KIND)
+    title = models.CharField(max_length=150)
+    message = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=(models.Q(booking__isnull=False, period__isnull=True)
-                           | models.Q(booking__isnull=True, period__isnull=False)),
-                name="mpesa_payment_exactly_one_target",
-            ),
-        ]
-
-    def __str__(self):
-        return f"M-Pesa {self.checkout_request_id} - {self.status}"
-
-
-class MpesaCallbackEvent(models.Model):
-    """Keep callbacks that race the STK response for later reconciliation."""
-    checkout_request_id = models.CharField(max_length=100, unique=True)
-    payload = models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    processed_at = models.DateTimeField(null=True, blank=True)
+        constraints = [models.UniqueConstraint(fields=["user", "booking", "kind"], name="unique_booking_notification")]
+        ordering = ["-created_at", "-id"]
 
 
 class HousePhoto(models.Model):

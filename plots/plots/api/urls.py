@@ -17,13 +17,10 @@ urlpatterns = [
 
     # Bookings
     path("bookings/", v.booking_list),
+    path("bookings/<int:pk>/", v.booking_detail),
     path("bookings/<int:pk>/cancel/", v.booking_cancel),
-    path("bookings/<int:pk>/periods/", v.booking_periods),
-
-    # Payments
-    path("pay/<str:kind>/<int:pk>/", v.pay_mock),
-    path("payments/<int:pk>/", v.payment_status),
-    path("mpesa/callback/", v.mpesa_callback),
+    path("notifications/", v.user_notifications),
+    path("notifications/<int:pk>/read/", v.notification_read),
 
     # Dashboard
     path("dashboard/", v.dashboard),
@@ -35,8 +32,10 @@ urlpatterns = [
     path("manager/apartments/<int:pk>/photos/", m.manager_house_photos),
     path("manager/apartments/<int:pk>/photos/<int:photo_pk>/", m.manager_house_photo_detail),
     path("manager/bookings/", m.manager_bookings),
+    path("manager/booking-requests/unread-count/", m.manager_booking_unread_count),
     path("manager/bookings/<int:pk>/", m.manager_booking_detail),
-    path("manager/payments/", m.manager_payments),
+    path("manager/bookings/<int:pk>/approve/", m.manager_booking_approve),
+    path("manager/bookings/<int:pk>/reject/", m.manager_booking_reject),
     path("manager/announcements/", m.manager_announcements),
     path("manager/announcements/<int:pk>/", m.manager_announcement_detail),
     path("manager/tenants/", m.manager_tenants),

@@ -10,9 +10,12 @@ export default function HouseDetail() {
   const [house, setHouse] = useState(null);
   const [checkIn, setCheckIn] = useState(params.get("check_in") || "");
   const [checkOut, setCheckOut] = useState(params.get("check_out") || "");
+  const [contactNumber, setContactNumber] = useState("");
+  const [guestCount, setGuestCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [message, setMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -68,11 +71,13 @@ export default function HouseDetail() {
     try {
       const response = await api("/bookings/", {
         method: "POST",
-        body: JSON.stringify({ house: Number(id), check_in: checkIn, check_out: checkOut }),
+        body: JSON.stringify({ house: Number(id), check_in: checkIn, check_out: checkOut,
+          contact_number: contactNumber, guest_count: Number(guestCount) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(errorText(data));
-      setMessage("Booking created. Booking ID " + data.id + ".");
+      setMessage("Your booking request has been submitted successfully. It is awaiting manager approval. You will receive a notification when the manager reviews your request.");
+      setShowSuccess(true);
     } catch (requestError) {
       setError(requestError.message || "Could not create the booking.");
     } finally {
@@ -104,6 +109,8 @@ export default function HouseDetail() {
           <form className="grid gap-3" onSubmit={updateDates}>
             <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-in <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
             <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-out <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
+            <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Contact number <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="tel" required value={contactNumber} onChange={(event) => setContactNumber(event.target.value)} /></label>
+            <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Guests <input className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="number" min="1" max="30" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /></label>
             <button className="rounded-xl border border-nest-300 bg-white px-4 py-2.5 text-sm font-semibold text-nest-800 transition hover:bg-nest-100" type="submit">Check availability</button>
           </form>
           {house.availability === true && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Available for these dates.</p>}
@@ -129,6 +136,7 @@ export default function HouseDetail() {
           </div>
         </article>
       )}
+      {showSuccess && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="presentation"><section className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" role="alertdialog" aria-modal="true" aria-labelledby="booking-success-title"><h2 id="booking-success-title" className="text-xl font-semibold text-ink">Request submitted</h2><p className="mt-3 text-sm leading-6 text-muted">{message}</p><button className="mt-5 rounded-xl bg-nest-800 px-5 py-3 font-semibold text-white" onClick={() => setShowSuccess(false)}>Continue</button></section></div>}
     </section>
   );
 }

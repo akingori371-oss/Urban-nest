@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from ..models import (Announcement, Booking, House, HousePhoto, ManagerInvitation,
-                      MpesaPayment, PaymentPeriod, Review)
+                      Review)
 
 User = get_user_model()
 
@@ -78,28 +78,29 @@ class HouseDetailSerializer(HouseSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     house_name = serializers.CharField(source="house.name", read_only=True)
     nights = serializers.IntegerField(read_only=True)
-    is_long = serializers.BooleanField(read_only=True)
+    contact_number = serializers.CharField(required=True, max_length=30, allow_blank=False)
+    guest_count = serializers.IntegerField(required=True, min_value=1, max_value=30)
 
     class Meta:
         model = Booking
         fields = ["id", "house", "house_name", "check_in", "check_out",
-                  "nights", "total_price", "status", "paid", "is_long"]
-        read_only_fields = ["total_price", "status", "paid"]
+                  "contact_number", "guest_count", "nights", "total_price",
+                  "status", "created_at"]
+        read_only_fields = ["total_price", "status", "created_at"]
+
+    def validate_house(self, value):
+        if not value.is_active:
+            raise serializers.ValidationError("This apartment is not currently available for booking.")
+        return value
 
     def validate(self, data):
         if data["check_in"] < timezone.localdate():
             raise serializers.ValidationError("Check-in can't be in the past.")
         if data["check_out"] <= data["check_in"]:
             raise serializers.ValidationError("Check-out must be after check-in.")
-        if not data["house"].is_free(data["check_in"], data["check_out"]):
-            raise serializers.ValidationError("That apartment is already booked for those dates.")
+        contact = data.get("contact_number", "").strip()
+        data["contact_number"] = contact
         return data
-
-
-class PaymentPeriodSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PaymentPeriod
-        fields = ["id", "number", "start", "end", "amount", "paid"]
 
 
 class ManagerHouseSerializer(serializers.ModelSerializer):
@@ -139,25 +140,6 @@ class ManagerAnnouncementSerializer(serializers.ModelSerializer):
         model = Announcement
         fields = ["id", "title", "message", "created_at", "is_published", "recipient_ids"]
         read_only_fields = ["id", "created_at"]
-
-
-class ManagerPaymentSerializer(serializers.ModelSerializer):
-    tenant = serializers.SerializerMethodField()
-    apartment = serializers.SerializerMethodField()
-    booking_id = serializers.IntegerField(read_only=True)
-    period_id = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = MpesaPayment
-        fields = ["id", "tenant", "apartment", "booking_id", "period_id", "amount", "phone", "receipt", "status", "result_description", "created_at"]
-
-    def get_tenant(self, obj):
-        booking = obj.booking or (obj.period.booking if obj.period_id else None)
-        return {"id": booking.user_id, "username": booking.user.username, "email": booking.user.email} if booking else None
-
-    def get_apartment(self, obj):
-        booking = obj.booking or (obj.period.booking if obj.period_id else None)
-        return {"id": booking.house_id, "name": booking.house.name} if booking else None
 
 
 class ManagerInvitationSerializer(serializers.ModelSerializer):

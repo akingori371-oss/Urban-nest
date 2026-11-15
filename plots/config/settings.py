@@ -1,9 +1,7 @@
 ﻿
 from pathlib import Path
 import os
-import ipaddress
 from datetime import timedelta
-from urllib.parse import urlsplit
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -138,14 +136,19 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Urban Nest <no-reply@local
 URBAN_NEST_FRONTEND_URL = os.getenv("URBAN_NEST_FRONTEND_URL", "http://localhost:5173")
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# Email. Local development defaults to console output; SMTP configuration is
+# supplied only through environment variables.
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 
@@ -167,47 +170,6 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
-
-MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY")
-MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET")
-MPESA_PASSKEY = os.getenv("MPESA_PASSKEY")
-MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "174379")
-MPESA_CALLBACK_URL = os.getenv("MPESA_CALLBACK_URL", "")
-MPESA_ENVIRONMENT = os.getenv("MPESA_ENVIRONMENT", "sandbox").strip().lower()
-if MPESA_ENVIRONMENT != "sandbox":
-    raise ImproperlyConfigured("Only the Daraja Sandbox environment is enabled.")
-MPESA_TRANSACTION_TYPE = os.getenv("MPESA_TRANSACTION_TYPE", "CustomerPayBillOnline")
-if MPESA_TRANSACTION_TYPE not in {"CustomerPayBillOnline", "CustomerBuyGoodsOnline"}:
-    raise ImproperlyConfigured("MPESA_TRANSACTION_TYPE must be a supported Daraja STK Push type.")
-MPESA_API_BASE_URL = "https://sandbox.safaricom.co.ke"
-
-
-def is_valid_mpesa_callback_url(value):
-    """Accept only the public HTTPS callback endpoint served by this project."""
-    if not value or value != value.strip() or any(character.isspace() for character in value):
-        return False
-    try:
-        parsed = urlsplit(value)
-        hostname = parsed.hostname
-        parsed.port  # Accessing this validates any explicit port.
-        if (parsed.scheme.lower() != "https" or not parsed.netloc or not hostname
-                or parsed.username or parsed.password or parsed.query or parsed.fragment
-                or parsed.path != "/api/mpesa/callback/"):
-            return False
-        hostname = hostname.rstrip(".").lower()
-        if hostname == "localhost" or hostname.endswith((".localhost", ".local")):
-            return False
-        try:
-            if not ipaddress.ip_address(hostname).is_global:
-                return False
-        except ValueError:
-            pass
-        return True
-    except ValueError:
-        return False
-
-
-MPESA_CALLBACK_URL_VALID = is_valid_mpesa_callback_url(MPESA_CALLBACK_URL)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
