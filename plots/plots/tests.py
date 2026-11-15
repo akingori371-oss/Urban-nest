@@ -109,6 +109,14 @@ class BookingWorkflowTests(TestCase):
     def test_approval_creates_decision_notification_email_and_reserves_dates(self):
         result = self.submit()
         booking = Booking.objects.get(pk=result.data["id"])
+        self.auth(self.customer)
+        received = self.client.get("/api/notifications/")
+        received_notification = next(
+            item for item in received.data["results"] if item["kind"] == "booking_received"
+        )
+        self.assertEqual(received.data["unread_count"], 1)
+        self.client.post(f"/api/notifications/{received_notification['id']}/read/", {}, format="json")
+
         self.auth(self.manager)
         response = self.client.post(f"/api/manager/bookings/{booking.pk}/approve/", {}, format="json")
         self.assertEqual(response.status_code, 200)
@@ -116,6 +124,35 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(mail.outbox[-1].subject, "Urban Nest - Booking Confirmed")
         self.assertFalse(self.house.is_free(booking.check_in, booking.check_out))
         self.assertEqual(self.client.post(f"/api/manager/bookings/{booking.pk}/approve/", {}, format="json").status_code, 409)
+        self.assertEqual(BookingNotification.objects.filter(user=self.customer, booking=booking, kind="booking_decision").count(), 1)
+
+        self.auth(self.customer)
+        notifications = self.client.get("/api/notifications/")
+        decision = next(item for item in notifications.data["results"] if item["kind"] == "booking_decision")
+        self.assertEqual(notifications.data["unread_count"], 1)
+        self.assertEqual(decision["booking_id"], booking.pk)
+        self.assertEqual(decision["title"], "Booking confirmed")
+        self.assertIn("approved", decision["message"])
+        self.assertFalse(decision["read"])
+
+        self.auth(self.other)
+        other_notifications = self.client.get("/api/notifications/")
+        self.assertEqual(other_notifications.data["unread_count"], 0)
+        self.assertFalse(other_notifications.data["results"])
+        self.assertEqual(
+            self.client.post(f"/api/notifications/{decision['id']}/read/", {}, format="json").status_code,
+            404,
+        )
+
+        self.auth(self.customer)
+        self.assertEqual(
+            self.client.post(f"/api/notifications/{decision['id']}/read/", {}, format="json").status_code,
+            200,
+        )
+        read_notifications = self.client.get("/api/notifications/")
+        read_decision = next(item for item in read_notifications.data["results"] if item["id"] == decision["id"])
+        self.assertEqual(read_notifications.data["unread_count"], 0)
+        self.assertTrue(read_decision["read"])
 
     def test_manager_unread_count_persists_and_reading_one_decrements(self):
         first = self.submit().data
