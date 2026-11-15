@@ -271,6 +271,31 @@ class ProvisionMainManagerCommandTests(TestCase):
         self.assertFalse(ManagerInvitation.objects.exists())
         send_mail.assert_not_called()
 
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.example.test",
+        EMAIL_HOST_USER="sender@example.test",
+        EMAIL_HOST_PASSWORD="test-only",
+        EMAIL_PORT=587,
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=False,
+        DEFAULT_FROM_EMAIL="Urban Nest <no-reply@example.test>",
+    )
+    @patch("plots.management.commands.provision_main_manager.send_mail", return_value=0)
+    def test_command_removes_invitation_if_delivery_is_not_confirmed(self, send_mail):
+        User.objects.create_user(
+            username="fresh-main",
+            email="akingori371@gmail.com",
+            password="StrongPass123!",
+        )
+
+        with self.assertRaisesMessage(CommandError, "Could not send the verification email"):
+            call_command("provision_main_manager")
+
+        self.assertFalse(ManagerInvitation.objects.exists())
+        self.assertFalse(ManagerProfile.objects.filter(is_main=True).exists())
+        send_mail.assert_called_once()
+
 
 @override_settings(
     PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],

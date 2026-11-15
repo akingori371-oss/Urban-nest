@@ -50,9 +50,15 @@ class Command(BaseCommand):
         base = getattr(settings, "URBAN_NEST_FRONTEND_URL", "http://localhost:5173").rstrip("/")
         link = f"{base}/manager/invitations/accept/{token}"
         try:
-            send_mail("Verify your Urban Nest main manager account",
-                      f"Sign in to the Urban Nest account for {MAIN_EMAIL}, then open this single-use link to verify ownership and activate main-manager access:\n\n{link}\n\nThis link expires in 7 days.",
-                      settings.DEFAULT_FROM_EMAIL, [MAIN_EMAIL], fail_silently=False)
+            delivered = send_mail(
+                "Verify your Urban Nest main manager account",
+                f"Sign in to the Urban Nest account for {MAIN_EMAIL}, then open this single-use link to verify ownership and activate main-manager access:\n\n{link}\n\nThis link expires in 7 days.",
+                settings.DEFAULT_FROM_EMAIL,
+                [MAIN_EMAIL],
+                fail_silently=False,
+            )
+            if delivered != 1:
+                raise RuntimeError("Email backend did not confirm delivery.")
         except Exception as exc:
             invitation.delete()
             raise CommandError("Could not send the verification email. Check the configured email settings.") from exc
