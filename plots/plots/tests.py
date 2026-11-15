@@ -154,6 +154,74 @@ class BookingWorkflowTests(TestCase):
         self.assertEqual(read_notifications.data["unread_count"], 0)
         self.assertTrue(read_decision["read"])
 
+    def test_manager_clarification_notifies_only_customer_and_is_idempotent(self):
+        result = self.submit()
+        booking = Booking.objects.get(pk=result.data["id"])
+        self.auth(self.customer)
+        received = self.client.get("/api/notifications/")
+        received_notification = next(
+            item for item in received.data["results"] if item["kind"] == "booking_received"
+        )
+        self.client.post(f"/api/notifications/{received_notification['id']}/read/", {}, format="json")
+
+        payload = {"message": "Please confirm the number of guests for this booking."}
+        self.auth(self.manager)
+        clarified = self.client.post(
+            f"/api/manager/bookings/{booking.pk}/clarify/", payload, format="json")
+        self.assertEqual(clarified.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "pending")
+        self.assertEqual(
+            self.client.post(f"/api/manager/bookings/{booking.pk}/clarify/", payload, format="json").status_code,
+            409,
+        )
+        self.assertEqual(
+            BookingNotification.objects.filter(
+                user=self.customer, booking=booking, kind="booking_clarification").count(),
+            1,
+        )
+        self.assertTrue(self.client.get(f"/api/manager/bookings/{booking.pk}/").data["clarification_requested"])
+
+        self.auth(self.customer)
+        notifications = self.client.get("/api/notifications/")
+        clarification = next(
+            item for item in notifications.data["results"] if item["kind"] == "booking_clarification"
+        )
+        self.assertEqual(notifications.data["unread_count"], 1)
+        self.assertEqual(clarification["booking_id"], booking.pk)
+        self.assertEqual(clarification["title"], "Clarification requested")
+        self.assertIn(payload["message"], clarification["message"])
+        self.assertFalse(clarification["read"])
+        self.assertEqual(self.client.get(f"/api/bookings/{booking.pk}/").status_code, 200)
+        self.assertEqual(self.client.get("/api/dashboard/").data["notifications_unread"], 1)
+
+        self.auth(self.other)
+        other_notifications = self.client.get("/api/notifications/")
+        self.assertEqual(other_notifications.data["unread_count"], 0)
+        self.assertFalse(other_notifications.data["results"])
+        self.assertEqual(self.client.get(f"/api/bookings/{booking.pk}/").status_code, 404)
+        self.assertEqual(
+            self.client.post(f"/api/notifications/{clarification['id']}/read/", {}, format="json").status_code,
+            404,
+        )
+
+        self.auth(self.customer)
+        self.assertEqual(
+            self.client.post(f"/api/notifications/{clarification['id']}/read/", {}, format="json").status_code,
+            200,
+        )
+        self.assertEqual(self.client.get("/api/notifications/").data["unread_count"], 0)
+
+        self.auth(self.manager)
+        approved = self.client.post(f"/api/manager/bookings/{booking.pk}/approve/", {}, format="json")
+        self.assertEqual(approved.status_code, 200)
+        self.assertEqual(approved.data["status"], "confirmed")
+        self.auth(self.customer)
+        after_approval = self.client.get("/api/notifications/")
+        decision = next(item for item in after_approval.data["results"] if item["kind"] == "booking_decision")
+        self.assertEqual(decision["booking_id"], booking.pk)
+        self.assertEqual(after_approval.data["unread_count"], 1)
+
     def test_manager_unread_count_persists_and_reading_one_decrements(self):
         first = self.submit().data
         self.submit(start=self.start + timedelta(days=4), end=self.start + timedelta(days=6))
@@ -169,6 +237,10 @@ class BookingWorkflowTests(TestCase):
         self.auth(self.customer)
         self.assertEqual(self.client.get("/api/manager/booking-requests/unread-count/").status_code, 403)
         self.assertEqual(self.client.post("/api/manager/bookings/1/approve/", {}, format="json").status_code, 403)
+        self.assertEqual(
+            self.client.post("/api/manager/bookings/1/clarify/", {"message": "Please clarify."}, format="json").status_code,
+            403,
+        )
 
     def test_manager_cannot_review_their_own_booking_request(self):
         response = self.submit(user=self.manager)
@@ -332,6 +404,63 @@ class ProvisionMainManagerCommandTests(TestCase):
         self.assertFalse(ManagerInvitation.objects.exists())
         self.assertFalse(ManagerProfile.objects.filter(is_main=True).exists())
         send_mail.assert_called_once()
+
+
+@override_settings(
+    DEBUG=True,
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class LocalMainManagerActivationTests(TestCase):
+    def test_existing_account_is_activated_without_email_and_can_use_manager_apis(self):
+        user = User.objects.create_user(
+            username="existing-main",
+            email="akingori371@gmail.com",
+            password="ExistingPass123!",
+        )
+
+        call_command("provision_main_manager", activate_existing=True)
+        profile = ManagerProfile.objects.get(user=user)
+        self.assertTrue(profile.is_main)
+        self.assertEqual(ManagerProfile.objects.filter(is_main=True).count(), 1)
+        self.assertFalse(ManagerInvitation.objects.exists())
+        self.assertFalse(mail.outbox)
+
+        profile.is_main = False
+        profile.save(update_fields=["is_main"])
+        call_command("provision_main_manager", activate_existing=True)
+        profile.refresh_from_db()
+        self.assertTrue(profile.is_main)
+        self.assertEqual(ManagerProfile.objects.filter(user=user).count(), 1)
+        self.assertTrue(user.check_password("ExistingPass123!"))
+
+        login = APIClient().post(
+            "/api/auth/login/",
+            {"email": user.email, "password": "ExistingPass123!"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertTrue(login.data["is_manager"])
+        self.assertTrue(login.data["is_main_manager"])
+
+        manager_client = APIClient()
+        manager_client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        self.assertTrue(manager_client.get("/api/auth/me/").data["is_main_manager"])
+        self.assertEqual(manager_client.get("/api/manager/dashboard/").status_code, 200)
+        self.assertEqual(manager_client.get("/api/manager/bookings/").status_code, 200)
+        self.assertEqual(manager_client.get("/api/manager/managers/").status_code, 200)
+
+        customer = User.objects.create_user(
+            username="ordinary-customer",
+            email="customer@example.test",
+            password="CustomerPass123!",
+        )
+        customer_client = APIClient()
+        customer_client.force_authenticate(customer)
+        self.assertEqual(customer_client.get("/api/manager/dashboard/").status_code, 403)
+        self.assertEqual(customer_client.get("/api/manager/bookings/").status_code, 403)
+        self.assertEqual(customer_client.get("/api/manager/managers/").status_code, 403)
+        self.assertFalse(mail.outbox)
 
 
 @override_settings(

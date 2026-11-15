@@ -103,6 +103,10 @@ class BookingSerializer(serializers.ModelSerializer):
         return data
 
 
+class BookingClarificationSerializer(serializers.Serializer):
+    message = serializers.CharField(max_length=1000)
+
+
 class ManagerHouseSerializer(serializers.ModelSerializer):
     class Meta:
         model = House

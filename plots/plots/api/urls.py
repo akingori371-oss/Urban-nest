@@ -36,6 +36,7 @@ urlpatterns = [
     path("manager/bookings/<int:pk>/", m.manager_booking_detail),
     path("manager/bookings/<int:pk>/approve/", m.manager_booking_approve),
     path("manager/bookings/<int:pk>/reject/", m.manager_booking_reject),
+    path("manager/bookings/<int:pk>/clarify/", m.manager_booking_clarify),
     path("manager/announcements/", m.manager_announcements),
     path("manager/announcements/<int:pk>/", m.manager_announcement_detail),
     path("manager/tenants/", m.manager_tenants),

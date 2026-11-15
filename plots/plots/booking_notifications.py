@@ -44,6 +44,18 @@ def create_decision_notification(booking):
     )[0]
 
 
+def create_clarification_notification(booking, message):
+    return BookingNotification.objects.get_or_create(
+        user=booking.user,
+        booking=booking,
+        kind="booking_clarification",
+        defaults={
+            "title": "Clarification requested",
+            "message": f"The manager needs more information: {message}",
+        },
+    )[0]
+
+
 def send_booking_email(booking, event):
     if not booking.user.email:
         return False

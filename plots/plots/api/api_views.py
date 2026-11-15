@@ -192,7 +192,7 @@ def booking_cancel(request, pk):
 @permission_classes([IsAuthenticated])
 def user_notifications(request):
     customer_notifications = BookingNotification.objects.filter(
-        user=request.user, kind__in=["booking_received", "booking_decision"])
+        user=request.user, kind__in=["booking_received", "booking_decision", "booking_clarification"])
     notifications = customer_notifications.select_related("booking", "booking__house")[:100]
     return Response({
         "unread_count": customer_notifications.filter(read_at__isnull=True).count(),
@@ -221,7 +221,7 @@ def dashboard(request):
                      .filter(Q(recipients__isnull=True) | Q(recipients=request.user)).distinct()[:5]]
     return Response({"announcements": announcements,
                      "notifications_unread": BookingNotification.objects.filter(
-                         user=request.user, kind__in=["booking_received", "booking_decision"],
+                         user=request.user, kind__in=["booking_received", "booking_decision", "booking_clarification"],
                          read_at__isnull=True).count()})
 
 

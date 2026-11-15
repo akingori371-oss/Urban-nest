@@ -19,9 +19,10 @@ from rest_framework.response import Response
 from ..manager_permissions import IsManager, IsMainManager
 from ..models import (Announcement, Booking, BookingNotification, House, HousePhoto, ManagerInvitation,
                       ManagerProfile)
-from ..booking_notifications import create_decision_notification, mark_manager_request_read, send_booking_email
+from ..booking_notifications import (create_clarification_notification, create_decision_notification,
+                                     mark_manager_request_read, send_booking_email)
 from .serializers import (BookingSerializer, HousePhotoSerializer,
-                          ManagerAnnouncementSerializer, ManagerHouseSerializer,
+                          BookingClarificationSerializer, ManagerAnnouncementSerializer, ManagerHouseSerializer,
                           ManagerInvitationSerializer)
 
 User = get_user_model()
@@ -200,6 +201,8 @@ def manager_booking_detail(request, pk):
                             "email": booking.user.email},
                  "apartment": {"id": booking.house_id, "name": booking.house.name,
                                "location": booking.house.location},
+                 "clarification_requested": BookingNotification.objects.filter(
+                     user=booking.user, booking=booking, kind="booking_clarification").exists(),
                  "unread": False})
     return Response(data)
 
@@ -233,6 +236,27 @@ def manager_booking_approve(request, pk):
 @permission_classes([IsManager])
 def manager_booking_reject(request, pk):
     return decide_booking(request, pk, "rejected")
+
+
+@api_view(["POST"])
+@permission_classes([IsManager])
+def manager_booking_clarify(request, pk):
+    serializer = BookingClarificationSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    with transaction.atomic():
+        booking = get_object_or_404(
+            Booking.objects.select_for_update().select_related("house", "user"), pk=pk)
+        if booking.user_id == request.user.pk:
+            return Response({"detail": "You cannot review your own booking request."}, status=403)
+        if booking.status != "pending":
+            return Response({"detail": "Only pending booking requests can be clarified."}, status=409)
+        if BookingNotification.objects.filter(
+            user=booking.user, booking=booking, kind="booking_clarification"
+        ).exists():
+            return Response({"detail": "A clarification has already been requested for this booking."}, status=409)
+        create_clarification_notification(booking, serializer.validated_data["message"])
+        mark_manager_request_read(request.user, booking)
+    return Response({"detail": "Clarification request sent.", "booking_id": booking.pk})
 
 
 @api_view(["GET", "POST"])

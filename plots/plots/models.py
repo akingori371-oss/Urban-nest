@@ -105,6 +105,7 @@ def record_login(sender, request, user, **kwargs):
 class BookingNotification(models.Model):
     KIND = [("booking_received", "Booking received"),
             ("booking_decision", "Booking decision"),
+            ("booking_clarification", "Booking clarification"),
             ("manager_booking_request", "Manager booking request")]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="booking_notifications")
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="notifications")

@@ -120,10 +120,26 @@ function BookingList() {
 }
 
 function BookingDetail() {
-  const { id } = useParams(); const { data, error, busy } = useResource(`/manager/bookings/${id}/`);
+  const { id } = useParams(); const { data, error, busy, reload } = useResource(`/manager/bookings/${id}/`);
+  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
   useEffect(() => { if (data) window.dispatchEvent(new Event("urban-nest-booking-count-refresh")); }, [data]);
+  async function requestClarification(event) {
+    event.preventDefault();
+    const response = await api(`/manager/bookings/${id}/clarify/`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+    const body = await response.json();
+    if (!response.ok) setNotice(errorText(body));
+    else {
+      setMessage("");
+      setNotice("Clarification request sent.");
+      reload();
+    }
+  }
   if (busy) return <p>Loading booking...</p>;
-  return <><div className="mb-6"><p className="text-xs font-bold tracking-[.16em] text-nest-600">BOOKING #{id}</p><h1 className="text-3xl font-semibold tracking-tight text-ink">{data?.apartment?.name}</h1></div><ResultMessage error={error} />{data && <section className="grid gap-3 rounded-2xl border border-line bg-white p-5 shadow-sm"><p><strong>Customer</strong> {data.tenant.username} ? {data.tenant.email}</p><p><strong>Contact</strong> {data.contact_number || "Not provided"}</p><p><strong>Dates</strong> {data.check_in} ? {data.check_out} ? {data.nights} nights</p><p><strong>Guests</strong> {data.guest_count}</p><p><strong>Estimated cost</strong> KSh {formatKsh(data.total_price)}</p><p><strong>Status</strong> <span className="capitalize">{data.status}</span></p><p><strong>Submitted</strong> {new Date(data.created_at).toLocaleString()}</p></section>}</>;
+  return <><div className="mb-6"><p className="text-xs font-bold tracking-[.16em] text-nest-600">BOOKING #{id}</p><h1 className="text-3xl font-semibold tracking-tight text-ink">{data?.apartment?.name}</h1></div><ResultMessage error={error || (notice && notice !== "Clarification request sent." ? notice : "")} message={notice === "Clarification request sent." ? notice : ""} />{data && <><section className="grid gap-3 rounded-2xl border border-line bg-white p-5 shadow-sm"><p><strong>Customer</strong> {data.tenant.username} ? {data.tenant.email}</p><p><strong>Contact</strong> {data.contact_number || "Not provided"}</p><p><strong>Dates</strong> {data.check_in} ? {data.check_out} ? {data.nights} nights</p><p><strong>Guests</strong> {data.guest_count}</p><p><strong>Estimated cost</strong> KSh {formatKsh(data.total_price)}</p><p><strong>Status</strong> <span className="capitalize">{data.status}</span></p><p><strong>Submitted</strong> {new Date(data.created_at).toLocaleString()}</p></section>{data.status === "pending" && <section className="mt-4 rounded-2xl border border-line bg-white p-5 shadow-sm">{data.clarification_requested ? <p role="status">A clarification request has already been sent to this customer.</p> : <form className="grid gap-3" onSubmit={requestClarification}><h2 className="font-semibold text-ink">Request clarification</h2><p className="text-sm text-muted">The booking remains pending while the customer responds.</p><label htmlFor="booking-clarification" className="text-sm font-medium text-ink">Message to customer</label><textarea id="booking-clarification" className="min-h-28 rounded-xl border border-line p-3" required maxLength={1000} value={message} onChange={(event) => setMessage(event.target.value)} /><button className="justify-self-start rounded-xl bg-nest-800 px-4 py-2.5 font-semibold text-white">Send clarification request</button></form>}</section>}</>}</>;
 }
 
 function AnnouncementList() {
