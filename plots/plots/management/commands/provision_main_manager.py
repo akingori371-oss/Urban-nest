@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import timedelta
+from email.utils import parseaddr
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,15 +13,23 @@ from plots.models import ManagerInvitation, ManagerProfile
 
 
 MAIN_EMAIL = "akingori371@gmail.com"
+SMTP_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 
 class Command(BaseCommand):
     help = "Email a single-use verification invitation to the configured initial Urban Nest main manager."
 
     def handle(self, *args, **options):
-        mail_backend = settings.EMAIL_BACKEND
-        if mail_backend.endswith("console.EmailBackend") or mail_backend.endswith("locmem.EmailBackend"):
-            raise CommandError("Configure a secure delivery email backend before provisioning the main manager.")
+        if settings.EMAIL_BACKEND != SMTP_EMAIL_BACKEND:
+            raise CommandError("Set EMAIL_BACKEND to Django's SMTP backend before provisioning the main manager.")
+        if not settings.EMAIL_HOST or not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            raise CommandError("Configure EMAIL_HOST, EMAIL_HOST_USER, and EMAIL_HOST_PASSWORD before provisioning.")
+        if settings.EMAIL_USE_TLS == settings.EMAIL_USE_SSL:
+            raise CommandError("Enable exactly one of EMAIL_USE_TLS or EMAIL_USE_SSL before provisioning.")
+        sender_address = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
+        if not sender_address or sender_address.lower().endswith("@localhost"):
+            raise CommandError("Configure DEFAULT_FROM_EMAIL with a verified sender address before provisioning.")
+
         user = get_user_model().objects.filter(email__iexact=MAIN_EMAIL, is_active=True).first()
         if not user:
             raise CommandError(f"Create an active account for {MAIN_EMAIL} first. The command will not create or promote accounts by email alone.")

@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+import hashlib
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -219,7 +220,16 @@ class ManagerAndListingsTests(TestCase):
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class ProvisionMainManagerCommandTests(TestCase):
-    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend")
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.example.test",
+        EMAIL_HOST_USER="sender@example.test",
+        EMAIL_HOST_PASSWORD="test-only",
+        EMAIL_PORT=587,
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=False,
+        DEFAULT_FROM_EMAIL="Urban Nest <no-reply@example.test>",
+    )
     @patch("plots.management.commands.provision_main_manager.send_mail", return_value=1)
     def test_command_requires_existing_account_and_sends_verification_without_granting_role(self, send_mail):
         with self.assertRaises(CommandError):
@@ -238,3 +248,69 @@ class ProvisionMainManagerCommandTests(TestCase):
         self.assertEqual(invitation.status, "pending")
         self.assertFalse(ManagerProfile.objects.filter(user=user).exists())
         send_mail.assert_called_once()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="",
+        EMAIL_HOST_USER="",
+        EMAIL_HOST_PASSWORD="",
+        EMAIL_USE_TLS=True,
+        EMAIL_USE_SSL=False,
+    )
+    @patch("plots.management.commands.provision_main_manager.send_mail")
+    def test_command_rejects_missing_smtp_settings_before_creating_invitation(self, send_mail):
+        User.objects.create_user(
+            username="fresh-main",
+            email="akingori371@gmail.com",
+            password="StrongPass123!",
+        )
+
+        with self.assertRaisesMessage(CommandError, "EMAIL_HOST"):
+            call_command("provision_main_manager")
+
+        self.assertFalse(ManagerInvitation.objects.exists())
+        send_mail.assert_not_called()
+
+
+@override_settings(
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class MainManagerInvitationAcceptanceTests(TestCase):
+    def test_acceptance_grants_main_manager_access_and_invalidates_invitation_token(self):
+        user = User.objects.create_user(
+            username="main-manager",
+            email="akingori371@gmail.com",
+            password="StrongPass123!",
+        )
+        token = "single-use-test-token"
+        ManagerInvitation.objects.create(
+            email=user.email,
+            token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
+            is_main_provision=True,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        client = APIClient()
+        client.force_authenticate(user)
+
+        accepted = client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json")
+
+        self.assertEqual(accepted.status_code, 200)
+        self.assertTrue(accepted.data["is_main"])
+        profile = ManagerProfile.objects.get(user=user)
+        self.assertTrue(profile.is_main)
+        self.assertEqual(
+            client.post(f"/api/manager/invitations/accept/{token}/", {}, format="json").status_code,
+            404,
+        )
+
+        login = APIClient().post(
+            "/api/auth/login/",
+            {"email": user.email, "password": "StrongPass123!"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertTrue(login.data["is_manager"])
+        self.assertTrue(login.data["is_main_manager"])
+        self.assertEqual(client.get("/api/manager/dashboard/").status_code, 200)
+        self.assertEqual(client.get("/api/manager/bookings/").status_code, 200)
