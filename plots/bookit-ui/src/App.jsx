@@ -33,7 +33,7 @@ export default function App() {
           <Link to={username ? "/dashboard" : "/"} className="mr-3 flex items-center gap-2 rounded-full px-1 py-1 text-lg font-bold tracking-tight text-white hover:text-white">
             <span className="grid size-9 place-items-center rounded-xl bg-nest-200 text-sm font-black text-nest-900">U</span>Urban Nest
           </Link>
-          {username && <><Link className={navLink} to="/dashboard">Dashboard</Link><Link className={navLink} to="/houses">Explore</Link><Link className={navLink} to="/bookings">My stays</Link>{isManager && <Link className={navLink} to="/manager">Manager</Link>}</>}
+          {username && <><Link className={navLink} to="/dashboard">Dashboard</Link><Link className={navLink} to="/houses">Homes</Link><Link className={navLink} to="/bookings">My stays</Link>{isManager && <Link className={navLink} to="/manager">Manager</Link>}</>}
         </div>
         <div className="flex items-center gap-2">
           {username ? <><span className="hidden pr-2 text-sm text-white/65 sm:inline">{username}</span><button className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/50 hover:bg-white/10" onClick={() => { logout(); navigate("/login"); }}>Log out</button></> : <><Link className={navLink} to="/login">Log in</Link><Link className="rounded-full bg-nest-200 px-4 py-2 text-sm font-bold text-nest-900 transition hover:bg-white" to="/register">Create account</Link></>}

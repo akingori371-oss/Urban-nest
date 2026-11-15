@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, errorText } from "../Api.js";
 import { apartmentPrice, apartmentRatingLabel, apartmentTypeLabel, demoApartmentInfo, visibleApartmentDescription } from "../apartmentDisplay.js";
+import PhotoCarousel from "../components/PhotoCarousel.jsx";
 
 export default function HouseDetail() {
   const { id } = useParams();
@@ -23,12 +24,12 @@ export default function HouseDetail() {
       const data = await response.json();
       if (!response.ok) throw new Error(errorText(data));
       if (!data || !Number.isInteger(data.id) || typeof data.name !== "string") {
-        throw new Error("The server returned an unexpected apartment details response.");
+        throw new Error("The server returned an unexpected home details response.");
       }
       setHouse(data);
     } catch (requestError) {
       setHouse(null);
-      setError(requestError.message || "Could not load this apartment.");
+      setError(requestError.message || "Could not load this home.");
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export default function HouseDetail() {
       return;
     }
     if (house?.availability === false) {
-      setError("This apartment is unavailable for those dates. Choose another date range.");
+      setError("This home is unavailable for those dates. Choose another date range.");
       return;
     }
     setBooking(true);
@@ -90,7 +91,7 @@ export default function HouseDetail() {
       {error && !house && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</p>}
       {house && (
         <article className="overflow-hidden rounded-[1.75rem] border border-line bg-white shadow-sm">
-          <div className="grid min-h-48 place-items-center bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-6xl text-nest-600 sm:min-h-64" aria-hidden="true">⌂</div>
+          <PhotoCarousel className="rounded-none sm:aspect-[2/1] sm:rounded-none" photos={house.photos} name={house.name} />
           <div className="grid gap-5 p-6 sm:p-9 lg:grid-cols-[1fr_320px] lg:gap-10">
           <div><p className="text-xs font-bold uppercase tracking-[.18em] text-nest-600">{apartmentTypeLabel(house)} · {house.location}</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{house.name}</h1>
           <p className="mt-5 text-2xl font-semibold text-ink">KES {price.amount}<span className="text-sm font-normal text-muted"> / {price.unit}</span></p>
@@ -110,7 +111,7 @@ export default function HouseDetail() {
           {message && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{message}</p>}
           {error && house && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
           <button className="mt-3 w-full rounded-xl bg-nest-800 px-4 py-3 font-semibold text-white transition hover:bg-nest-900 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={createBooking} disabled={booking || loading || house.availability === false}>
-            {booking ? "Booking..." : "Book this apartment"}
+            {booking ? "Booking..." : "Book this home"}
           </button>
           </aside>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, errorText } from "../Api.js";
 import { apartmentPrice, apartmentRatingLabel, apartmentTypeLabel, demoApartmentInfo } from "../apartmentDisplay.js";
+import PhotoCarousel from "../components/PhotoCarousel.jsx";
 
 export default function Houses() {
   const [params, setParams] = useSearchParams();
@@ -25,13 +26,13 @@ export default function Houses() {
       const data = await response.json();
       if (!response.ok) throw new Error(errorText(data));
       if (!data || !Array.isArray(data.results) || !Number.isFinite(data.count)) {
-        throw new Error("The server returned an unexpected apartment list response.");
+        throw new Error("The server returned an unexpected home list response.");
       }
       setHouses(data.results);
       setCount(data.count || 0);
     } catch (requestError) {
       setHouses([]);
-      setError(requestError.message || "Could not load apartments.");
+      setError(requestError.message || "Could not load homes.");
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export default function Houses() {
       <form className="mb-9 grid gap-4 rounded-2xl border border-line bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_auto] lg:items-end" onSubmit={searchHouses}>
         <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-in <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
         <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Check-out <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
-        <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Search by name or area <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink placeholder:text-muted/70 focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Neighbourhood, house name…" /></label>
+        <label className="grid gap-2 text-xs font-bold uppercase tracking-wider text-muted">Search by name or area <input className="min-h-11 rounded-xl border border-line bg-nest-50/50 px-3 text-sm font-normal text-ink placeholder:text-muted/70 focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Neighbourhood, home name…" /></label>
         <button className="min-h-11 rounded-xl bg-nest-800 px-6 py-2.5 font-semibold text-white transition hover:bg-nest-900" type="submit">Search homes</button>
       </form>
 
@@ -80,7 +81,7 @@ export default function Houses() {
           const demo = demoApartmentInfo(house);
           return (
           <article className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-soft" key={house.id}>
-            <div className="mb-5 grid aspect-[16/9] place-items-center rounded-xl bg-gradient-to-br from-nest-100 via-[#edf0e6] to-[#d8e3d7] text-4xl text-nest-600" aria-hidden="true">⌂</div>
+            <PhotoCarousel className="mb-5" photos={house.photos} name={house.name} />
             <p className="text-xs font-bold uppercase tracking-wider text-nest-600">{apartmentTypeLabel(house)}</p>
             <h2 className="mt-1 text-xl font-semibold text-ink"><Link className="text-ink transition hover:text-nest-700" to={"/houses/" + house.id + "?" + params.toString()}>{house.name}</Link></h2>
             <p className="mt-1 text-sm text-muted">{house.location}</p>
