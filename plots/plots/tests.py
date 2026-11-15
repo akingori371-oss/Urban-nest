@@ -632,6 +632,37 @@ class UrbanNestAPITests(TestCase):
         self.assertEqual(payment.status, "pending")
         self.assertFalse(Booking.objects.get(pk=booking_pk).paid)
 
+    @patch("plots.api.api_views.query_stk_push", side_effect=DarajaRequestError("STK query", "Sandbox query unavailable."))
+    def test_unverified_push_error_is_exposed_but_never_marks_payment_paid(self, query):
+        booking_pk = self.booking().data["id"]
+        booking = Booking.objects.get(pk=booking_pk)
+        payment = MpesaPayment.objects.create(
+            booking=booking,
+            phone="254712345678",
+            amount=booking.total_price,
+            checkout_request_id="checkout-push-error",
+            merchant_request_id="merchant-push-error",
+        )
+        callback = {
+            "Body": {"stkCallback": {
+                "CheckoutRequestID": payment.checkout_request_id,
+                "MerchantRequestID": payment.merchant_request_id,
+                "ResultCode": 9999,
+                "ResultDesc": "Error occurred while sending push request.",
+            }},
+        }
+
+        accepted = self.client.post("/api/mpesa/callback/", callback, format="json")
+        status = self.client.get(f"/api/payments/{payment.pk}/")
+
+        payment.refresh_from_db()
+        self.assertEqual(accepted.status_code, 202)
+        self.assertEqual(status.data["status"], "pending")
+        self.assertTrue(status.data["callback_reconciliation_pending"])
+        self.assertEqual(status.data["callback_result_code"], 9999)
+        self.assertFalse(payment.booking.paid)
+        self.assertEqual(query.call_count, 2)
+
     @patch("plots.api.api_views.initiate_stk_push")
     def test_long_stay_period_still_uses_its_own_amount_and_booking(self, initiate):
         response = self.booking(self.start, self.start + timedelta(days=65))

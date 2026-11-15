@@ -71,7 +71,12 @@ export default function MpesaPay({ periodId, bookingId, amount, onPaid }) {
           return;
         } else {
           setError("");
-          if (data.status === "uncertain") {
+          if (data.callback_reconciliation_pending) {
+            setInitiationUncertain(true);
+            setStatusMessage(data.callback_result_code === 9999
+              ? "M-Pesa reported an error sending the payment request to your phone. We are verifying the result; do not start another payment yet."
+              : "M-Pesa sent a status update that is still being verified. Do not start another payment yet.");
+          } else if (data.status === "uncertain") {
             setStatusMessage("The STK response was incomplete. Checking its status with Safaricom; do not start another payment.");
           } else {
             setInitiationUncertain(false);

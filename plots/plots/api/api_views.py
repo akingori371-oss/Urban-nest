@@ -324,12 +324,33 @@ def masked_phone(phone):
 
 def payment_data(payment):
     uncertain = payment_is_uncertain(payment)
+    callback_event = None
+    if payment.checkout_request_id:
+        callback_event = MpesaCallbackEvent.objects.filter(
+            checkout_request_id=payment.checkout_request_id,
+            processed_at__isnull=True,
+        ).only("payload").first()
+    callback = {}
+    if callback_event and isinstance(callback_event.payload, dict):
+        body = callback_event.payload.get("Body")
+        stk_callback = body.get("stkCallback") if isinstance(body, dict) else None
+        if isinstance(stk_callback, dict):
+            callback = stk_callback
+    callback_code = callback.get("ResultCode")
+    try:
+        if isinstance(callback_code, bool):
+            raise ValueError
+        callback_code = int(callback_code) if callback_code is not None else None
+    except (TypeError, ValueError):
+        callback_code = None
     return {"id": payment.id, "status": "uncertain" if uncertain else payment.status,
             "booking": payment.booking_id,
             "period": payment.period_id, "amount": str(payment.amount), "phone": masked_phone(payment.phone),
             "receipt": payment.receipt or None, "result_code": payment.result_code,
             "result_description": payment.result_description,
             "initiation_uncertain": uncertain and not payment.checkout_request_id,
+            "callback_reconciliation_pending": callback_event is not None,
+            "callback_result_code": callback_code,
             "stk_accepted": bool(payment.checkout_request_id and payment.status == "pending")}
 
 
