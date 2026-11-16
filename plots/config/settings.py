@@ -139,30 +139,35 @@ URBAN_NEST_FRONTEND_URL = os.getenv("URBAN_NEST_FRONTEND_URL", "http://localhost
 
 # Email. Local development defaults to console output; SMTP configuration is
 # supplied only through environment variables.
+
 SMTP_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND",
     "django.core.mail.backends.console.EmailBackend" if DEBUG else SMTP_EMAIL_BACKEND,
 )
+
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
+
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured("Choose either EMAIL_USE_TLS or EMAIL_USE_SSL, not both.")
 
-if not DEBUG:
-    if EMAIL_BACKEND != SMTP_EMAIL_BACKEND:
-        raise ImproperlyConfigured("Production email must use Django's SMTP backend.")
+if not DEBUG and EMAIL_BACKEND == SMTP_EMAIL_BACKEND:
     if not EMAIL_HOST or not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
         raise ImproperlyConfigured("Configure EMAIL_HOST, EMAIL_HOST_USER, and EMAIL_HOST_PASSWORD.")
+
     if not (EMAIL_USE_TLS or EMAIL_USE_SSL):
         raise ImproperlyConfigured("Production SMTP must use TLS or SSL.")
+
     sender_address = parseaddr(DEFAULT_FROM_EMAIL)[1]
     if not sender_address or sender_address.lower().endswith("@localhost"):
         raise ImproperlyConfigured("Configure DEFAULT_FROM_EMAIL with a verified sender address.")
+
 
 
 REST_FRAMEWORK = {
