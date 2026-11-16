@@ -43,7 +43,7 @@ INSTALLED_APPS = [
 
 CORS_ALLOWED_ORIGINS = [
     "https://urban-nest-2-topaz.vercel.app",
-"https://urban-nest-2-9a7pw1mcv-kin12.vercel.app",
+    "https://urban-nest-sooty-mu.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
