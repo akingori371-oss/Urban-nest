@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api, errorText } from "../api.js";
+import { api, errorText } from "../Api.js";
 
 const fieldClass = "rounded-xl border border-line bg-nest-50/50 px-4 py-3 text-ink placeholder:text-muted/70 focus:border-nest-500 focus:outline-none focus:ring-4 focus:ring-nest-100";
 const buttonClass = "rounded-xl bg-nest-800 px-5 py-3.5 font-semibold text-white transition hover:bg-nest-900 disabled:cursor-not-allowed disabled:opacity-60";
