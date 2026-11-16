@@ -1,4 +1,4 @@
-const BASE = (import.meta.env?.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+const BASE = (import.meta.env?.VITE_API_URL || "/api").replace(/\/$/, "");
 const DEFAULT_TIMEOUT_MS = 20000;
 
 export class ApiError extends Error {
