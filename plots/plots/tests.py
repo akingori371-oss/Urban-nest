@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import (Announcement, Booking, BookingNotification, House, HousePhoto,
-                     ManagerInvitation, ManagerProfile)
+                     ManagerInvitation, ManagerProfile, PasswordResetOTP)
 from .management.commands.seed_demo_apartments import DEMO_APARTMENTS
 
 User = get_user_model()
@@ -505,3 +505,165 @@ class MainManagerInvitationAcceptanceTests(TestCase):
         self.assertTrue(login.data["is_main_manager"])
         self.assertEqual(client.get("/api/manager/dashboard/").status_code, 200)
         self.assertEqual(client.get("/api/manager/bookings/").status_code, 200)
+
+
+@override_settings(
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    SECRET_KEY="password-reset-otp-test-key",
+)
+class PasswordResetOTPTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="reset-user",
+            email="reset@example.test",
+            password="OriginalPass123!",
+        )
+        self.client = APIClient()
+
+    def request_code(self):
+        return self.client.post(
+            "/api/auth/password-reset/request/",
+            {"email": self.user.email},
+            format="json",
+        )
+
+    def verify_code(self, otp):
+        return self.client.post(
+            "/api/auth/password-reset/verify/",
+            {"email": self.user.email, "otp": otp},
+            format="json",
+        )
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_generates_six_digit_code_and_stores_only_keyed_hash(self, randbelow):
+        response = self.request_code()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("000042", mail.outbox[0].body)
+        reset = PasswordResetOTP.objects.get(user=self.user)
+        self.assertEqual(len(reset.otp_hash), 64)
+        self.assertNotEqual(reset.otp_hash, "000042")
+        self.assertEqual(reset.expires_at - reset.created_at, timedelta(minutes=10))
+        randbelow.assert_called_once_with(1_000_000)
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_expired_code_cannot_be_verified(self, _randbelow):
+        self.request_code()
+        reset = PasswordResetOTP.objects.get(user=self.user)
+        reset.expires_at = timezone.now() - timedelta(seconds=1)
+        reset.save(update_fields=["expires_at"])
+
+        response = self.verify_code("000042")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIsNone(reset.consumed_at)
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_fifth_incorrect_attempt_invalidates_code(self, _randbelow):
+        self.request_code()
+
+        for _ in range(5):
+            response = self.verify_code("999999")
+            self.assertEqual(response.status_code, 400)
+
+        reset = PasswordResetOTP.objects.get(user=self.user)
+        self.assertEqual(reset.attempts, 5)
+        self.assertIsNotNone(reset.consumed_at)
+        self.assertEqual(reset.otp_hash, "")
+        self.assertEqual(self.verify_code("000042").status_code, 400)
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_code_is_single_use_and_resend_is_rate_limited(self, _randbelow):
+        self.assertEqual(self.request_code().status_code, 200)
+        self.assertEqual(self.request_code().status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+
+        verified = self.verify_code("000042")
+        self.assertEqual(verified.status_code, 200)
+        self.assertNotIn("authorization", verified.data)
+        self.assertTrue(verified.cookies["password_reset_authorization"]["httponly"])
+        self.assertEqual(self.verify_code("000042").status_code, 400)
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_otp_alone_cannot_reset_password_and_reset_authorization_is_single_use(self, _randbelow):
+        self.request_code()
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/password-reset/complete/",
+                {"password": "NewStrongPass123!"},
+                format="json",
+            ).status_code,
+            400,
+        )
+
+        self.verify_code("000042")
+        completed = self.client.post(
+            "/api/auth/password-reset/complete/",
+            {"password": "NewStrongPass123!"},
+            format="json",
+        )
+        self.assertEqual(completed.status_code, 200)
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/password-reset/complete/",
+                {"password": "AnotherStrongPass123!"},
+                format="json",
+            ).status_code,
+            400,
+        )
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewStrongPass123!"))
+        self.assertFalse(self.user.check_password("OriginalPass123!"))
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/login/",
+                {"email": self.user.email, "password": "NewStrongPass123!"},
+                format="json",
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/auth/login/",
+                {"email": self.user.email, "password": "OriginalPass123!"},
+                format="json",
+            ).status_code,
+            401,
+        )
+
+    def test_invalid_and_expired_reset_authorizations_are_rejected(self):
+        self.client.cookies["password_reset_authorization"] = "invalid-authorization"
+        invalid = self.client.post(
+            "/api/auth/password-reset/complete/",
+            {"password": "NewStrongPass123!"},
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, 400)
+
+        with patch("plots.api.api_views.secrets.randbelow", return_value=42):
+            self.request_code()
+            self.verify_code("000042")
+        reset = PasswordResetOTP.objects.get(user=self.user)
+        reset.reset_authorization_expires_at = timezone.now() - timedelta(seconds=1)
+        reset.save(update_fields=["reset_authorization_expires_at"])
+        expired = self.client.post(
+            "/api/auth/password-reset/complete/",
+            {"password": "NewStrongPass123!"},
+            format="json",
+        )
+        self.assertEqual(expired.status_code, 400)
+
+    @patch("plots.api.api_views.secrets.randbelow", return_value=42)
+    def test_new_password_is_validated_by_django(self, _randbelow):
+        self.request_code()
+        self.verify_code("000042")
+
+        response = self.client.post(
+            "/api/auth/password-reset/complete/",
+            {"password": "short"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)

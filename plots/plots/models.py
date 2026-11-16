@@ -155,3 +155,15 @@ class ManagerInvitation(models.Model):
 
     def __str__(self):
         return f"{self.email} ({self.status})"
+
+
+class PasswordResetOTP(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    otp_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField()
+    expires_at = models.DateTimeField(db_index=True)
+    last_sent_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    reset_authorization_hash = models.CharField(max_length=64, null=True, blank=True, unique=True)
+    reset_authorization_expires_at = models.DateTimeField(null=True, blank=True)

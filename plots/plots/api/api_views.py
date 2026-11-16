@@ -1,6 +1,15 @@
 ﻿
+from datetime import timedelta
+import hashlib
+import hmac
+import secrets
+
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.auth.password_validation import validate_password
+from django.core.mail import send_mail
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404
@@ -12,13 +21,16 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from ..models import House, Booking, Announcement, BookingNotification
+from ..models import House, Booking, Announcement, BookingNotification, PasswordResetOTP
 from ..booking_notifications import create_submission_notifications, manager_users, send_booking_email
 
 from .serializers import (
     RegisterSerializer, HouseSerializer,
     BookingSerializer, HouseDetailSerializer
 )
+
+PASSWORD_RESET_COOKIE = "password_reset_authorization"
+PASSWORD_RESET_COOKIE_PATH = "/api/auth/password-reset/"
 
  
 def err(msg, code=400):
@@ -70,6 +82,153 @@ def login_view(request):
         "is_manager": bool(user.is_superuser or profile),
         "is_main_manager": bool(user.is_superuser or (profile and profile.is_main)),
     })
+
+
+def _password_reset_otp_hash(user_id, otp):
+    message = f"password-reset:{user_id}:{otp}".encode("utf-8")
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def _password_reset_authorization_hash(authorization):
+    message = f"password-reset-authorization:{authorization}".encode("utf-8")
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_request(request):
+    email = (request.data.get("email") or "").strip()
+    if not email:
+        return err("Send an email address.")
+
+    user = get_user_model().objects.filter(email__iexact=email).first()
+    if user:
+        now = timezone.now()
+        with transaction.atomic():
+            reset, _ = PasswordResetOTP.objects.select_for_update().get_or_create(
+                user=user,
+                defaults={
+                    "otp_hash": "",
+                    "created_at": now,
+                    "expires_at": now,
+                    "last_sent_at": now - timedelta(seconds=60),
+                },
+            )
+            if now < reset.last_sent_at + timedelta(seconds=60):
+                return Response({
+                    "detail": "If an account exists for that email, a verification code will be sent."
+                })
+
+            otp = f"{secrets.randbelow(1_000_000):06d}"
+            reset.otp_hash = _password_reset_otp_hash(user.pk, otp)
+            reset.created_at = now
+            reset.expires_at = now + timedelta(minutes=10)
+            reset.last_sent_at = now
+            reset.attempts = 0
+            reset.consumed_at = None
+            reset.reset_authorization_hash = None
+            reset.reset_authorization_expires_at = None
+            reset.save()
+            sent = send_mail(
+                "Urban Nest password reset code",
+                f"Your password reset code is {otp}. It expires in 10 minutes.",
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            if not sent:
+                raise RuntimeError("Password reset email was not accepted for delivery.")
+
+    return Response({
+        "detail": "If an account exists for that email, a verification code will be sent."
+    })
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_verify(request):
+    email = (request.data.get("email") or "").strip()
+    otp = request.data.get("otp")
+    if not email or not isinstance(otp, str):
+        return err("Send an email address and verification code.")
+
+    user = get_user_model().objects.filter(email__iexact=email).first()
+    if not user:
+        return err("The verification code is invalid or expired.")
+
+    with transaction.atomic():
+        reset = PasswordResetOTP.objects.select_for_update().filter(user=user).first()
+        now = timezone.now()
+        if (reset is None or reset.consumed_at is not None or reset.expires_at <= now
+                or reset.attempts >= 5):
+            return err("The verification code is invalid or expired.")
+
+        expected_hash = _password_reset_otp_hash(user.pk, otp)
+        if not hmac.compare_digest(reset.otp_hash, expected_hash):
+            reset.attempts += 1
+            if reset.attempts >= 5:
+                reset.consumed_at = now
+                reset.otp_hash = ""
+            reset.save(update_fields=["attempts", "consumed_at", "otp_hash"])
+            return err("The verification code is invalid or expired.")
+
+        authorization = secrets.token_urlsafe(32)
+        reset.consumed_at = now
+        reset.otp_hash = ""
+        reset.reset_authorization_hash = _password_reset_authorization_hash(authorization)
+        reset.reset_authorization_expires_at = now + timedelta(minutes=10)
+        reset.save(update_fields=[
+            "consumed_at", "otp_hash", "reset_authorization_hash",
+            "reset_authorization_expires_at",
+        ])
+
+    response = Response({"detail": "Verification code accepted."})
+    response.set_cookie(
+        PASSWORD_RESET_COOKIE,
+        authorization,
+        max_age=600,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="Lax",
+        path=PASSWORD_RESET_COOKIE_PATH,
+    )
+    return response
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_complete(request):
+    authorization = request.COOKIES.get(PASSWORD_RESET_COOKIE)
+    password = request.data.get("password")
+    if not authorization or not isinstance(password, str) or not password:
+        return err("A valid reset authorization and new password are required.")
+
+    authorization_hash = _password_reset_authorization_hash(authorization)
+    with transaction.atomic():
+        reset = PasswordResetOTP.objects.select_for_update().filter(
+            reset_authorization_hash=authorization_hash,
+        ).first()
+        now = timezone.now()
+        if reset is None or reset.reset_authorization_expires_at is None or reset.reset_authorization_expires_at <= now:
+            response = err("The reset authorization is invalid or expired.")
+            response.delete_cookie(PASSWORD_RESET_COOKIE, path=PASSWORD_RESET_COOKIE_PATH)
+            return response
+
+        user = get_user_model().objects.select_for_update().get(pk=reset.user_id)
+        try:
+            validate_password(password, user)
+        except ValidationError as exc:
+            return err(" ".join(exc.messages))
+
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        reset.reset_authorization_hash = None
+        reset.reset_authorization_expires_at = None
+        reset.save(update_fields=["reset_authorization_hash", "reset_authorization_expires_at"])
+
+    response = Response({"detail": "Password reset successfully."})
+    response.delete_cookie(PASSWORD_RESET_COOKIE, path=PASSWORD_RESET_COOKIE_PATH)
+    return response
  
  
 @api_view(["GET"])

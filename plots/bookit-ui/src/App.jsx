@@ -1,6 +1,8 @@
 import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./auth.js";
 import Login from "./pages/Login.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Houses from "./pages/Houses.jsx";
@@ -42,7 +44,7 @@ export default function App() {
       </nav>
     </header>
     <main className="mx-auto min-h-[calc(100vh-76px)] w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <Routes><Route path="/" element={<Landing />} /><Route path="/login" element={<Login />} /><Route path="/register" element={<Register />} /><Route path="/dashboard" element={<Protected><Dashboard /></Protected>} /><Route path="/houses" element={<Protected><Houses /></Protected>} /><Route path="/houses/:id" element={<Protected><HouseDetail /></Protected>} /><Route path="/bookings" element={<Protected><MyBookings /></Protected>} /><Route path="/bookings/:id" element={<Protected><BookingCard /></Protected>} /><Route path="/notifications" element={<Protected><Notifications /></Protected>} /><Route path="/manager/invitations/accept/:token" element={<InvitationAccept />} /><Route path="/manager/*" element={<ManagerProtected />} /></Routes>
+      <Routes><Route path="/" element={<Landing />} /><Route path="/login" element={<Login />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="/register" element={<Register />} /><Route path="/dashboard" element={<Protected><Dashboard /></Protected>} /><Route path="/houses" element={<Protected><Houses /></Protected>} /><Route path="/houses/:id" element={<Protected><HouseDetail /></Protected>} /><Route path="/bookings" element={<Protected><MyBookings /></Protected>} /><Route path="/bookings/:id" element={<Protected><BookingCard /></Protected>} /><Route path="/notifications" element={<Protected><Notifications /></Protected>} /><Route path="/manager/invitations/accept/:token" element={<InvitationAccept />} /><Route path="/manager/*" element={<ManagerProtected />} /></Routes>
     </main>
   </>;
 }

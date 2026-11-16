@@ -8,6 +8,9 @@ urlpatterns = [
     # Authentication
     path("auth/register/", v.register),
     path("auth/login/", v.login_view),
+    path("auth/password-reset/request/", v.password_reset_request),
+    path("auth/password-reset/verify/", v.password_reset_verify),
+    path("auth/password-reset/complete/", v.password_reset_complete),
     path("auth/me/", v.me),
     path("auth/token/refresh/", TokenRefreshView.as_view()),
 

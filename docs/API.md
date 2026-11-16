@@ -8,6 +8,9 @@ All endpoints are under `/api/`. Unless stated otherwise, they require an authen
 | --- | --- | --- |
 | POST | `/api/auth/register/` | Register a customer |
 | POST | `/api/auth/login/` | Log in |
+| POST | `/api/auth/password-reset/request/` | Request an email verification code (public) |
+| POST | `/api/auth/password-reset/verify/` | Verify and consume the email code (sets a short-lived HttpOnly reset cookie) |
+| POST | `/api/auth/password-reset/complete/` | Set a new password using the reset cookie (public) |
 | GET | `/api/auth/me/` | Current account and role |
 | GET | `/api/houses/` | Paginated active listings, optionally filtered by dates/search |
 | GET | `/api/houses/{id}/` | Listing details, photos, reviews, and date availability |
@@ -19,6 +22,8 @@ All endpoints are under `/api/`. Unless stated otherwise, they require an authen
 | GET | `/api/dashboard/` | Customer announcements and unread notification count |
 
 Booking submissions require `house`, `check_in`, `check_out`, `contact_number`, and `guest_count`. `total_price`, `status`, and `created_at` are server controlled. New requests are always pending, and cost is calculated from the stored nightly price.
+
+Password reset requests accept `{"email": "..."}`; verification accepts `{"email": "...", "otp": "000000"}`; completion accepts `{"password": "..."}` with the HttpOnly reset cookie set by verification. Codes expire after 10 minutes, allow at most five incorrect attempts, and can be resent after 60 seconds. The reset authorization expires after 10 minutes and is single-use. Request responses do not disclose whether an account exists.
 
 ## Manager
 
