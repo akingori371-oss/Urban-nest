@@ -1,4 +1,9 @@
-const BASE = (import.meta.env?.VITE_API_URL || "/api").replace(/\/$/, "");
+const VITE_ENV = import.meta.env || {};
+const DEFAULT_API_URL = VITE_ENV.PROD
+  ? "https://urban-nest-backend-50z5.onrender.com"
+  : "/api";
+const API_URL = (VITE_ENV.VITE_API_URL || DEFAULT_API_URL).replace(/\/+$/, "");
+const BASE = /\/api$/i.test(API_URL) ? API_URL : `${API_URL}/api`;
 const DEFAULT_TIMEOUT_MS = 20000;
 
 export class ApiError extends Error {
