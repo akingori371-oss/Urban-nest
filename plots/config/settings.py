@@ -194,8 +194,6 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -205,14 +203,10 @@ LOGGING = {
         },
     },
     "loggers": {
-        "django": {
+        "django.request": {
             "handlers": ["console"],
             "level": "ERROR",
-            "propagate": True,
-        },
-        "": {
-            "handlers": ["console"],
-            "level": "ERROR",
+            "propagate": False,
         },
     },
 }
