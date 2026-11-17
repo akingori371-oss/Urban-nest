@@ -61,6 +61,19 @@ class IsSuperuser(BasePermission):
         )
 
 
+class IsManager(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        return bool(
+            user.is_superuser
+            or getattr(user, "manager_profile", None)
+        )
+
+
 # ---------- Auth ----------
 
 @api_view(["POST"])
@@ -613,7 +626,7 @@ def toggle_my_house(request, pk):
 # ---------- Admin property approval ----------
 
 @api_view(["GET"])
-@permission_classes([IsSuperuser])
+@permission_classes([IsManager])
 def pending_houses(request):
     houses = House.objects.filter(
         approval_status="pending"
@@ -629,7 +642,7 @@ def pending_houses(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsSuperuser])
+@permission_classes([IsManager])
 def review_house(request, pk):
     house = get_object_or_404(House, pk=pk)
 

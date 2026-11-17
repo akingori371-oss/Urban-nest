@@ -218,24 +218,394 @@ function BookingRequests() {
   return <><div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold tracking-[.16em] text-nest-600">RESERVATION REVIEW</p><h1 className="text-3xl font-semibold tracking-tight text-ink">Booking Requests</h1><p>Pending requests do not reserve apartment dates until approved.</p></div></div><ResultMessage error={error || (notice && !notice.startsWith("Booking request") ? notice : "")} message={notice.startsWith("Booking request") ? notice : ""} /><div className="mb-4 flex flex-wrap gap-2">{["pending", "confirmed", "rejected", "cancelled"].map((value) => <button key={value} className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${status === value ? "bg-nest-800 text-white" : "border border-line bg-white text-ink"}`} onClick={() => { setStatus(value); setPage(1); }}>{value}</button>)}</div>{busy ? <p role="status">Loading booking requests...</p> : <div className="grid gap-4">{(data?.results || []).map((booking) => <article key={booking.id} className={`rounded-2xl border bg-white p-5 shadow-sm ${booking.unread ? "border-red-200" : "border-line"}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-ink">{booking.apartment.name} <span className="text-sm font-normal text-muted">#{booking.id}</span></h2><p className="mt-1 text-sm text-muted">{booking.tenant.username} ? {booking.tenant.email}{booking.contact_number ? ` ? ${booking.contact_number}` : ""}</p><p className="mt-1 text-sm text-muted">{booking.check_in} ? {booking.check_out} ? {booking.nights} nights ? {booking.guest_count} guest{booking.guest_count === 1 ? "" : "s"}</p><p className="mt-1 text-sm font-semibold text-ink">Estimated cost: KSh {formatKsh(booking.total_price)}</p><p className="mt-1 text-xs text-muted">Submitted {new Date(booking.created_at).toLocaleString()} ? <span className="capitalize">{booking.status}</span></p></div>{booking.unread && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold text-white">Unread</span>}</div><div className="mt-4 flex flex-wrap gap-2"><Link className="rounded-lg border border-line px-3 py-2 text-sm font-semibold" to={`/manager/bookings/${booking.id}`}>View request</Link>{booking.status === "pending" && <><button className="rounded-lg bg-nest-800 px-3 py-2 text-sm font-semibold text-white" onClick={() => decide(booking, "approve")}>Approve booking</button><button className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700" onClick={() => decide(booking, "reject")}>Reject booking</button></>}</div></article>)}{!data?.results?.length && <p className="rounded-xl border border-dashed border-nest-300 p-6 text-center text-muted">No {status} bookings.</p>}</div>}<Pager data={data} page={page} setPage={setPage} /></>;
 }
 
-function ManagerLayout() {
-  const { isMainManager, logout } = useAuth(); const navigate = useNavigate();
-  const item = "rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-nest-50 hover:text-nest-800";
-  return <div className="grid min-h-full grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><aside className="flex flex-col gap-5 self-start rounded-card border border-line bg-white p-5 shadow-sm lg:sticky lg:top-24"><Link className="font-bold text-ink" to="/manager">Urban Nest <small className="block text-[.65rem] font-bold tracking-[.16em] text-muted">MANAGEMENT</small></Link><nav className="flex gap-1 overflow-x-auto lg:grid"><Link className={item} to="/manager">Overview</Link><Link className={item} to="/manager/apartments">Properties</Link><BookingRequestsNavLink className={item} /><Link className={item} to="/manager/bookings">Bookings</Link><Link className={item} to="/manager/announcements">Announcements</Link><Link className={item} to="/manager/tenants">Tenants</Link>{isMainManager && <><span className="mt-3 px-2 text-xs font-bold uppercase tracking-wider text-muted">MAIN MANAGER</span><Link className={item} to="/manager/managers">Managers</Link><Link className={item} to="/manager/invitations">Invitations</Link></>}</nav><button className="self-start rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:bg-nest-50" onClick={() => { logout(); navigate("/login"); }}>Log out</button></aside><main className="min-w-0 py-2"><Routes><Route index element={<ManagerDashboard />} /><Route path="apartments" element={<ApartmentList />} /><Route path="apartments/new" element={<ApartmentForm />} /><Route path="apartments/:id/edit" element={<ApartmentForm />} /><Route path="requests" element={<BookingRequests />} /><Route path="bookings" element={<BookingList />} /><Route path="bookings/:id" element={<BookingDetail />} /><Route path="announcements" element={<AnnouncementList />} /><Route path="tenants" element={<TenantList />} /><Route path="tenants/:id" element={<TenantDetail />} /><Route path="managers" element={<ManagersList />} /><Route path="invitations" element={<ManagerInvitations />} /><Route path="*" element={<Navigate to="/manager" replace />} /></Routes></main></div>;
+
+function PropertyApprovals() {
+  const { data, error, busy, reload, setData } = useResource(
+    "/admin/pending-houses/"
+  );
+
+  const [processingId, setProcessingId] = useState(null);
+  const [notice, setNotice] = useState("");
+
+  async function decide(house, decision) {
+    const action = decision === "approved" ? "approve" : "reject";
+
+    if (!window.confirm(
+      `Are you sure you want to ${action} "${house.name}"?`
+    )) return;
+
+    setProcessingId(house.id);
+    setNotice("");
+
+    try {
+      const response = await api(
+        `/admin/houses/${house.id}/review/`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            approval_status: decision,
+          }),
+        }
+      );
+
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(errorText(body));
+      }
+
+      setData((current) =>
+        (current || []).filter((item) => item.id !== house.id)
+      );
+
+      setNotice(
+        `${house.name} has been ${decision} successfully.`
+      );
+    } catch (err) {
+      setNotice(err.message || "Could not review this property.");
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  return (
+    <>
+      <div className="mb-6">
+        <p className="text-xs font-bold tracking-[.16em] text-nest-600">
+          PROPERTY REVIEW
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">
+          Property Approvals
+        </h1>
+        <p className="mt-2 text-muted">
+          Review customer-submitted properties before they appear in the
+          public listings.
+        </p>
+      </div>
+
+      <ResultMessage
+        error={
+          notice && !notice.includes("successfully") ? notice : ""
+        }
+        message={
+          notice.includes("successfully") ? notice : ""
+        }
+      />
+
+      {busy ? (
+        <p role="status">Loading pending properties...</p>
+      ) : error ? (
+        <ResultMessage error={error} />
+      ) : data?.length ? (
+        <div className="grid gap-5">
+          {data.map((house) => (
+            <article
+              key={house.id}
+              className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"
+            >
+              <div className="p-5">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-ink">
+                      {house.name}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted">
+                      {house.location}, {house.county}
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold capitalize text-amber-700">
+                    {house.approval_status}
+                  </span>
+                </div>
+
+                {house.photos?.length > 0 && (
+                  <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {house.photos.map((photo) => (
+                      <img
+                        key={photo.id}
+                        src={photo.image}
+                        alt={photo.caption || house.name}
+                        className="h-36 w-full rounded-xl object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <p>
+                    <strong>Property type:</strong>{" "}
+                    {house.property_type}
+                  </p>
+                  <p>
+                    <strong>Bedrooms:</strong> {house.bedrooms}
+                  </p>
+                  <p>
+                    <strong>Nightly price:</strong> KSh{" "}
+                    {formatKsh(house.price_per_night)}
+                  </p>
+                  <p>
+                    <strong>Submitted:</strong>{" "}
+                    {new Date(house.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h3 className="mb-1 font-semibold text-ink">
+                    Description
+                  </h3>
+                  <p className="whitespace-pre-line text-sm text-muted">
+                    {house.description || "No description provided."}
+                  </p>
+                </div>
+
+                {house.amenities?.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="mb-2 font-semibold text-ink">
+                      Amenities
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {house.amenities.map((amenity) => (
+                        <span
+                          key={amenity}
+                          className="rounded-full bg-nest-50 px-3 py-1 text-xs text-nest-800"
+                        >
+                          {amenity}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 border-t border-line pt-4">
+                  <h3 className="font-semibold text-ink">
+                    Submitted by
+                  </h3>
+                  <p className="mt-1 text-sm text-muted">
+                    {house.owner?.username || "Unknown customer"}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {house.owner?.email || "No email provided"}
+                  </p>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    disabled={processingId !== null}
+                    onClick={() => decide(house, "approved")}
+                    className="rounded-xl bg-nest-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-nest-900 disabled:opacity-50"
+                  >
+                    {processingId === house.id
+                      ? "Processing..."
+                      : "Approve property"}
+                  </button>
+
+                  <button
+                    disabled={processingId !== null}
+                    onClick={() => decide(house, "rejected")}
+                    className="rounded-xl border border-red-200 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Reject property
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-nest-300 p-10 text-center">
+          <h2 className="text-lg font-semibold text-ink">
+            All caught up!
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            There are currently no properties awaiting approval.
+          </p>
+        </div>
+      )}
+    </>
+  );
 }
 
-export default function ManagerArea() { return <ManagerLayout />; }
+
+
+function ManagerLayout() {
+  const { isMainManager, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const item =
+    "rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-nest-50 hover:text-nest-800";
+
+  return (
+    <div className="grid min-h-full grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="flex flex-col gap-5 self-start rounded-card border border-line bg-white p-5 shadow-sm lg:sticky lg:top-24">
+        <Link className="font-bold text-ink" to="/manager">
+          Urban Nest
+          <small className="block text-[.65rem] font-bold tracking-[.16em] text-muted">
+            MANAGEMENT
+          </small>
+        </Link>
+
+        <nav className="flex gap-1 overflow-x-auto lg:grid">
+          <Link className={item} to="/manager">
+            Overview
+          </Link>
+
+          <Link className={item} to="/manager/apartments">
+            Properties
+          </Link>
+
+          <Link className={item} to="/manager/property-approvals">
+            Property Approvals
+          </Link>
+
+          <BookingRequestsNavLink className={item} />
+
+          <Link className={item} to="/manager/bookings">
+            Bookings
+          </Link>
+
+          <Link className={item} to="/manager/announcements">
+            Announcements
+          </Link>
+
+          <Link className={item} to="/manager/tenants">
+            Tenants
+          </Link>
+
+          {isMainManager && (
+            <>
+              <span className="mt-3 px-2 text-xs font-bold uppercase tracking-wider text-muted">
+                MAIN MANAGER
+              </span>
+
+              <Link className={item} to="/manager/managers">
+                Managers
+              </Link>
+
+              <Link className={item} to="/manager/invitations">
+                Invitations
+              </Link>
+            </>
+          )}
+        </nav>
+
+        <button
+          className="self-start rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:bg-nest-50"
+          onClick={() => {
+            logout();
+            navigate("/login");
+          }}
+        >
+          Log out
+        </button>
+      </aside>
+
+      <main className="min-w-0 py-2">
+        <Routes>
+          <Route index element={<ManagerDashboard />} />
+
+          <Route path="apartments" element={<ApartmentList />} />
+          <Route path="apartments/new" element={<ApartmentForm />} />
+          <Route path="apartments/:id/edit" element={<ApartmentForm />} />
+
+          <Route
+            path="property-approvals"
+            element={<PropertyApprovals />}
+          />
+
+          <Route path="requests" element={<BookingRequests />} />
+
+          <Route path="bookings" element={<BookingList />} />
+          <Route path="bookings/:id" element={<BookingDetail />} />
+
+          <Route path="announcements" element={<AnnouncementList />} />
+
+          <Route path="tenants" element={<TenantList />} />
+          <Route path="tenants/:id" element={<TenantDetail />} />
+
+          <Route path="managers" element={<ManagersList />} />
+          <Route path="invitations" element={<ManagerInvitations />} />
+
+          <Route
+            path="*"
+            element={<Navigate to="/manager" replace />}
+          />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+export default function ManagerArea() {
+  return <ManagerLayout />;
+}
+
 
 export function InvitationAccept() {
-  const { token } = useParams(); const { username } = useAuth(); const [state, setState] = useState({ busy: true, error: "", message: "" });
-  useEffect(() => {
-    if (!username) return;
-    api(`/manager/invitations/accept/${token}/`, { method: "POST", body: JSON.stringify({}) }).then(async (response) => {
-      const body = await response.json(); if (!response.ok) throw new Error(errorText(body));
-      setState({ busy: false, error: "", message: body.detail });
-      setTimeout(() => window.location.assign("/manager"), 600);
-    }).catch((err) => setState({ busy: false, error: err.message, message: "" }));
-  }, [token, username]);
-  if (!username) return <section className="mx-auto my-12 grid w-full max-w-lg gap-4 rounded-[1.75rem] border border-line bg-white p-7 shadow-soft sm:p-10"><h2 className="text-2xl font-semibold text-ink">Accept manager invitation</h2><p className="text-sm leading-6 text-muted">Sign in with the invited email address to accept the invitation.</p><Link className="inline-flex min-h-11 items-center justify-center rounded-xl bg-nest-800 px-4 py-2.5 font-semibold text-white transition hover:bg-nest-900" to={`/login?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Log in to continue</Link><p className="text-sm text-muted">New to Urban Nest? <Link className="font-semibold text-nest-700" to={`/register?next=${encodeURIComponent(`/manager/invitations/accept/${token}`)}`}>Create an account with the invited email</Link></p></section>;
-  return <section className="mx-auto my-12 grid w-full max-w-lg gap-4 rounded-[1.75rem] border border-line bg-white p-7 shadow-soft sm:p-10"><h2 className="text-2xl font-semibold text-ink">Accept manager invitation</h2>{state.busy ? <p className="text-muted">Verifying invitation...</p> : <ResultMessage error={state.error} message={state.message} />}</section>;
+  const { token } = useParams();
+  const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function acceptInvitation() {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.post(
+        `/manager/invitations/accept/${token}/`
+      );
+
+      setMessage(response.data.detail || "Invitation accepted.");
+
+      if (refreshUser) {
+        await refreshUser();
+      }
+
+      setTimeout(() => navigate("/manager", { replace: true }), 1200);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-nest-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
+        <h1 className="text-2xl font-bold text-nest-900">
+          Manager Invitation
+        </h1>
+
+        <p className="mt-3 text-sm text-gray-600">
+          {user?.email
+            ? `You are signed in as ${user.email}.`
+            : "Sign in to the account that received this invitation."}
+        </p>
+
+        {message && (
+          <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            {message}
+          </p>
+        )}
+
+        {error && (
+          <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={acceptInvitation}
+          disabled={loading || !user?.email || !!message}
+          className="mt-6 w-full rounded-xl bg-nest-800 px-4 py-3 font-semibold text-white disabled:opacity-50"
+        >
+          {loading ? "Accepting..." : "Accept Invitation"}
+        </button>
+      </div>
+    </div>
+  );
 }

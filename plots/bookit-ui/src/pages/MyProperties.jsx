@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api, errorText } from "../Api.js";
 import PhotoCarousel from "../components/PhotoCarousel.jsx";
 import { apartmentPrice, apartmentTypeLabel } from "../apartmentDisplay.js";
@@ -26,6 +26,8 @@ export default function MyProperties() {
   const [actionId, setActionId] = useState(null);
   const [message, setMessage] = useState("");
 
+  const location = useLocation();
+
   const loadProperties = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -50,7 +52,7 @@ export default function MyProperties() {
 
   useEffect(() => {
     void loadProperties();
-  }, [loadProperties]);
+  }, [loadProperties, location.key]);
 
   async function toggleProperty(house) {
     const action = house.is_active ? "deactivate" : "activate";
@@ -85,9 +87,7 @@ export default function MyProperties() {
         )
       );
 
-      setMessage(
-        `${house.name} has been ${action}d successfully.`
-      );
+      setMessage(`${house.name} has been ${action}d successfully.`);
     } catch (requestError) {
       setError(requestError.message || `Could not ${action} property.`);
     } finally {
@@ -112,12 +112,23 @@ export default function MyProperties() {
           </p>
         </div>
 
-        <Link
-          to="/list-property"
-          className="rounded-xl bg-nest-800 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-nest-900"
-        >
-          + List a property
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={loadProperties}
+            disabled={loading}
+            className="rounded-xl border border-line bg-white px-5 py-3 text-sm font-semibold text-nest-800 transition hover:bg-nest-50 disabled:opacity-50"
+          >
+            {loading ? "Refreshing..." : "Refresh status"}
+          </button>
+
+          <Link
+            to="/list-property"
+            className="rounded-xl bg-nest-800 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-nest-900"
+          >
+            + List a property
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -249,6 +260,12 @@ export default function MyProperties() {
                 {house.approval_status === "pending" && (
                   <p className="mt-3 text-xs leading-5 text-amber-700">
                     Your property is awaiting admin approval.
+                  </p>
+                )}
+
+                {house.approval_status === "approved" && (
+                  <p className="mt-3 text-xs leading-5 text-emerald-700">
+                    Your property has been approved.
                   </p>
                 )}
 

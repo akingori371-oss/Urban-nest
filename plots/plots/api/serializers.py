@@ -66,13 +66,14 @@ class HouseSerializer(serializers.ModelSerializer):
             for p in photos
         ]
 
-
 class HouseSubmissionSerializer(serializers.ModelSerializer):
     amenities = serializers.ListField(
         child=serializers.CharField(max_length=50),
         required=False,
         default=list
     )
+    owner = serializers.SerializerMethodField()
+    photos = serializers.SerializerMethodField()
 
     class Meta:
         model = House
@@ -89,6 +90,8 @@ class HouseSubmissionSerializer(serializers.ModelSerializer):
             "approval_status",
             "is_active",
             "created_at",
+            "owner",
+            "photos",
         ]
 
         read_only_fields = [
@@ -96,6 +99,31 @@ class HouseSubmissionSerializer(serializers.ModelSerializer):
             "approval_status",
             "is_active",
             "created_at",
+        ]
+
+    def get_owner(self, house):
+        if not house.owner:
+            return None
+
+        return {
+            "id": house.owner.id,
+            "username": house.owner.username,
+            "email": house.owner.email,
+        }
+
+    def get_photos(self, house):
+        request = self.context.get("request")
+
+        return [
+            {
+                "id": photo.id,
+                "image": (
+                    request.build_absolute_uri(photo.image.url)
+                    if request else photo.image.url
+                ),
+                "caption": photo.caption,
+            }
+            for photo in house.photos.all()
         ]
 
     def validate_bedrooms(self, value):
@@ -131,7 +159,7 @@ class HouseSubmissionSerializer(serializers.ModelSerializer):
             approval_status="pending",
             is_active=True,
         )
-    
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -142,6 +170,7 @@ class HouseSubmissionSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
 
 
 
