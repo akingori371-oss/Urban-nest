@@ -150,6 +150,7 @@ class Command(BaseCommand):
                     bedrooms=bedrooms,
                     price_per_night=Decimal(nightly_price),
                     is_active=True,
+                    approval_status="approved",
                 )
                 created += 1
 
