@@ -131,6 +131,18 @@ class HouseSubmissionSerializer(serializers.ModelSerializer):
             approval_status="pending",
             is_active=True,
         )
+    
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.approval_status = "pending"
+        instance.reviewed_by = None
+        instance.reviewed_at = None
+
+        instance.save()
+        return instance
+
 
 
 
