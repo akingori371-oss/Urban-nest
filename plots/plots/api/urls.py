@@ -14,14 +14,25 @@ urlpatterns = [
     path("auth/me/", v.me),
     path("auth/token/refresh/", TokenRefreshView.as_view()),
 
-    # Houses
+    # Public houses
     path("houses/", v.house_list),
     path("houses/<int:pk>/", v.house_detail),
+
+    # User property submissions
+    path("my-houses/", v.my_houses),
+    path("my-houses/<int:pk>/", v.manage_my_house),
+    path("my-houses/<int:pk>/toggle/", v.toggle_my_house),
+
+    # Admin property approvals
+    path("admin/pending-houses/", v.pending_houses),
+    path("admin/houses/<int:pk>/review/", v.review_house),
 
     # Bookings
     path("bookings/", v.booking_list),
     path("bookings/<int:pk>/", v.booking_detail),
     path("bookings/<int:pk>/cancel/", v.booking_cancel),
+
+    # Notifications
     path("notifications/", v.user_notifications),
     path("notifications/<int:pk>/read/", v.notification_read),
 
@@ -50,4 +61,3 @@ urlpatterns = [
     path("manager/managers/", m.manager_list),
     path("manager/managers/<int:pk>/", m.manager_remove),
 ]
-
