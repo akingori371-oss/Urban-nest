@@ -1,3 +1,4 @@
+
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
@@ -95,6 +96,7 @@ class Command(BaseCommand):
                 column.name
                 for column in connection.introspection.get_table_description(cursor, House._meta.db_table)
             }
+
         if "is_active" not in columns:
             raise CommandError(
                 f"{House._meta.db_table}.is_active is missing despite the migration record. "
@@ -103,6 +105,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+
         if not dry_run:
             self._require_current_house_schema()
 
@@ -111,15 +114,25 @@ class Command(BaseCommand):
         would_create = 0
         updated = 0
         would_update = 0
+        approved = 0
+        would_approve = 0
 
         def seed_missing():
-            nonlocal created, skipped, would_create, updated, would_update
+            nonlocal created, skipped, would_create
+            nonlocal updated, would_update, approved, would_approve
+
             for apartment in DEMO_APARTMENTS:
-                identifier, county, name, area, property_type, bedrooms, nightly_price, rating, description = apartment
+                (
+                    identifier, county, name, area, property_type,
+                    bedrooms, nightly_price, rating, description
+                ) = apartment
+
                 marker = marker_for(apartment)
+
                 existing = House.objects.filter(
                     description__startswith=f"[[URBAN_NEST_DEMO|ID={identifier}|"
                 ).first()
+
                 if existing:
                     marker_end = existing.description.find("]]")
                     updated_description = (
@@ -127,16 +140,39 @@ class Command(BaseCommand):
                         if marker_end >= 0
                         else existing.description
                     )
+
                     price = Decimal(nightly_price)
-                    if existing.price_per_night == price and existing.description == updated_description:
-                        skipped += 1
-                    elif dry_run:
-                        would_update += 1
+                    needs_update = (
+                        existing.price_per_night != price
+                        or existing.description != updated_description
+                    )
+                    needs_approval = existing.approval_status != "approved"
+
+                    if dry_run:
+                        if needs_update:
+                            would_update += 1
+                        if needs_approval:
+                            would_approve += 1
                     else:
-                        existing.price_per_night = price
-                        existing.description = updated_description
-                        existing.save(update_fields=["price_per_night", "description"])
-                        updated += 1
+                        changed_fields = []
+
+                        if needs_update:
+                            existing.price_per_night = price
+                            existing.description = updated_description
+                            changed_fields.extend(["price_per_night", "description"])
+                            updated += 1
+
+                        if needs_approval:
+                            existing.approval_status = "approved"
+                            changed_fields.append("approval_status")
+                            approved += 1
+
+                        if changed_fields:
+                            existing.save(update_fields=changed_fields)
+
+                    if not needs_update and not needs_approval:
+                        skipped += 1
+
                     continue
 
                 if dry_run:
@@ -157,23 +193,29 @@ class Command(BaseCommand):
         if dry_run:
             seed_missing()
             self.stdout.write(
-                f"Dry run complete: {would_create} would be created; {skipped} already current; "
-                f"{would_update} would be price-updated; no records changed."
+                f"Dry run complete: {would_create} would be created; "
+                f"{would_update} would be updated; "
+                f"{would_approve} existing demo listings would be approved; "
+                f"{skipped} already current; no records changed."
             )
         else:
             with transaction.atomic():
                 if connection.vendor == "postgresql":
                     with connection.cursor() as cursor:
                         cursor.execute(ADVISORY_LOCK_SQL)
+
                 seed_missing()
+
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Created {created} demo apartments; updated {updated} demo prices; "
+                    f"Created {created} demo apartments; "
+                    f"updated {updated} demo listings; "
+                    f"approved {approved} existing demo listings; "
                     f"skipped {skipped} unchanged."
                 )
             )
 
         self.stdout.write(
-            "Included 50 supplied sample ratings as explicitly fictional demo metadata. "
-            "No customer reviews, users, bookings, or photos were created."
+            "Only listings identified by the URBAN_NEST_DEMO markers were updated. "
+            "Customer-submitted properties were not approved or modified."
         )
