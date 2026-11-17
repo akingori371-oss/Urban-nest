@@ -30,6 +30,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**data)
 
 
+
 class HouseSerializer(serializers.ModelSerializer):
     avg_rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
@@ -37,14 +38,101 @@ class HouseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = House
-        fields = ["id", "name", "location", "bedrooms", "price_per_night",
-                  "description", "avg_rating", "review_count", "photos"]
+        fields = [
+            "id",
+            "name",
+            "county",
+            "location",
+            "property_type",
+            "description",
+            "bedrooms",
+            "price_per_night",
+            "amenities",
+            "avg_rating",
+            "review_count",
+            "photos",
+        ]
 
     def get_photos(self, house):
         request = self.context.get("request")
         photos = house.photos.all()[:5]
-        return [{"id": p.id, "image": request.build_absolute_uri(p.image.url) if request else p.image.url,
-                 "caption": p.caption} for p in photos]
+
+        return [
+            {
+                "id": p.id,
+                "image": request.build_absolute_uri(p.image.url) if request else p.image.url,
+                "caption": p.caption,
+            }
+            for p in photos
+        ]
+
+
+class HouseSubmissionSerializer(serializers.ModelSerializer):
+    amenities = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        default=list
+    )
+
+    class Meta:
+        model = House
+        fields = [
+            "id",
+            "name",
+            "county",
+            "location",
+            "property_type",
+            "description",
+            "bedrooms",
+            "price_per_night",
+            "amenities",
+            "approval_status",
+            "is_active",
+            "created_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "approval_status",
+            "is_active",
+            "created_at",
+        ]
+
+    def validate_bedrooms(self, value):
+        if value < 1:
+            raise serializers.ValidationError(
+                "A property must have at least one bedroom."
+            )
+        return value
+
+    def validate_price_per_night(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Price per night must be greater than zero."
+            )
+        return value
+
+    def validate_county(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Please provide the county."
+            )
+
+        return value
+
+    def create(self, validated_data):
+        request = self.context["request"]
+
+        return House.objects.create(
+            **validated_data,
+            owner=request.user,
+            approval_status="pending",
+            is_active=True,
+        )
+
+
 
 
 class ReviewSummarySerializer(serializers.ModelSerializer):
