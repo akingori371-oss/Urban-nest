@@ -3,21 +3,106 @@ from django.db import models
 from django.utils import timezone
 
 
+
 class House(models.Model):
+    APPROVAL_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
     name = models.CharField(max_length=100)
+    county = models.CharField(max_length=100, blank=True, default="")
     location = models.CharField(max_length=100)
+    property_type = models.CharField(max_length=50, blank=True, default="")
     description = models.TextField(blank=True)
     bedrooms = models.PositiveSmallIntegerField(default=1)
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
+    amenities = models.JSONField(default=list, blank=True)
+
     is_active = models.BooleanField(default=True, db_index=True)
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owned_houses"
+    )
+
+    approval_status = models.CharField(
+        max_length=12,
+        choices=APPROVAL_STATUS_CHOICES,
+        default="pending",
+        db_index=True
+    )
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_houses"
+    )
+
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_publicly_visible(self):
+        return self.is_active and self.approval_status == "approved"
+
+    @property
+    def status(self):
+        return self.approval_status
+
+    @status.setter
+    def status(self, value):
+        self.approval_status = value
+
+    @property
+    def submitted_by(self):
+        return self.owner
+
+    @submitted_by.setter
+    def submitted_by(self, value):
+        self.owner = value
+
+    @property
+    def approved_by(self):
+        return self.reviewed_by
+
+    @approved_by.setter
+    def approved_by(self, value):
+        self.reviewed_by = value
+
+    @property
+    def approved_at(self):
+        return self.reviewed_at
+
+    @approved_at.setter
+    def approved_at(self, value):
+        self.reviewed_at = value
+
+    @property
+    def submitted_at(self):
+        return self.created_at
+
+    @submitted_at.setter
+    def submitted_at(self, value):
+        self.created_at = value
 
     def is_free(self, check_in, check_out):
         return not self.booking_set.filter(
-            status="confirmed", check_in__lt=check_out, check_out__gt=check_in
+            status="confirmed",
+            check_in__lt=check_out,
+            check_out__gt=check_in
         ).exists()
 
     def __str__(self):
         return self.name
+
 
 
 class Booking(models.Model):
