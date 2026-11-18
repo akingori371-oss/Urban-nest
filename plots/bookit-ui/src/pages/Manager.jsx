@@ -318,19 +318,27 @@ function PropertyApprovals() {
                     {house.approval_status}
                   </span>
                 </div>
-
-                {house.photos?.length > 0 && (
-                  <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {house.photos.map((photo) => (
-                      <img
+                  
+                 {house.photos?.filter(
+                  (photo) =>
+                    !photo.caption?.toLowerCase().includes("temporary low-resolution placeholder")
+                  ).length > 0 && (
+                    <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {house.photos.filter(
+                         (photo) =>
+                        !photo.caption?.toLowerCase().includes("temporary low-resolution placeholder")
+                        )
+                        .map((photo) => (
+                        <img
                         key={photo.id}
                         src={photo.image}
                         alt={photo.caption || house.name}
-                        className="h-36 w-full rounded-xl object-cover"
-                      />
-                    ))}
-                  </div>
+                        className="h-36 w-full rounded-xl object-cover"/>
+                        ))}
+                   </div>
                 )}
+
+                
 
                 <div className="grid gap-3 text-sm sm:grid-cols-2">
                   <p>

@@ -1,18 +1,18 @@
 import { useState } from "react";
 
+
 function orderedPhotos(photos) {
   if (!Array.isArray(photos)) return [];
-  return [...photos]
-    .filter((photo) => photo?.image)
-    .sort((a, b) => {
-      const rank = (photo) => {
-        const caption = String(photo.caption || "").toLowerCase();
-        if (caption.includes("interior")) return 0;
-        if (caption.includes("exterior")) return 1;
-        return 2;
-      };
-      return rank(a) - rank(b) || (a.id || 0) - (b.id || 0);
-    })
+
+  return photos
+    .filter(
+      (photo) =>
+        photo?.image &&
+        !String(photo.caption || "")
+          .toLowerCase()
+          .includes("temporary low-resolution placeholder")
+    )
+    .sort((a, b) => (a.id || 0) - (b.id || 0))
     .slice(0, 2);
 }
 
