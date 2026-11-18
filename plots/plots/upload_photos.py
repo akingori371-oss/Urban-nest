@@ -3,7 +3,7 @@ from pathlib import Path
 from django.core.files import File
 from plots.models import House, HousePhoto
 
-PHOTO_DIR = Path("../../Urban-nest-interior").resolve()
+PHOTO_DIR = Path("../../Urban-nest-exterior").resolve()
 
 image_files = sorted(
     p for p in PHOTO_DIR.rglob("*")
