@@ -55,7 +55,10 @@ INSTALLED_APPS = [
 CORS_ALLOWED_ORIGINS = [
     "https://urban-nest-2-topaz.vercel.app",
     "https://urban-nest-sooty-mu.vercel.app",
+    "https://urban-nest-git-main-kin12.vercel.app",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
