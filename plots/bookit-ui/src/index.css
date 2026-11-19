@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* stylelint-disable-next-line at-rule-no-unknown */
 @theme {
   --color-nest-50: #f4f7f2;
   --color-nest-100: #e7eee5;
@@ -25,4 +26,43 @@
   button, input, select, textarea { font: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 3px solid rgb(86 130 105 / 45%); outline-offset: 3px; }
+}
+
+
+/* Login button animation */
+.login-button-loading {
+  background-color: #173f32;
+}
+
+.login-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    #173f32 0%,
+    #315e49 25%,
+    #91ad91 50%,
+    #315e49 75%,
+    #173f32 100%
+  );
+  background-size: 200% 100%;
+  animation: login-color-sweep 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes login-color-sweep {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-sweep {
+    animation: none;
+    background-position: 50% 50%;
+  }
 }
