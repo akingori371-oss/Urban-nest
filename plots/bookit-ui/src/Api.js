@@ -4,7 +4,7 @@ const DEFAULT_API_URL = VITE_ENV.PROD
   : "/api";
 const API_URL = (VITE_ENV.VITE_API_URL || DEFAULT_API_URL).replace(/\/+$/, "");
 const BASE = /\/api$/i.test(API_URL) ? API_URL : `${API_URL}/api`;
-const DEFAULT_TIMEOUT_MS = 20000;
+const DEFAULT_TIMEOUT_MS = 90000;
 
 export class ApiError extends Error {
   constructor(message, { status = 0, url = "", data = null, cause } = {}) {
