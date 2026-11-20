@@ -56,7 +56,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://urban-nest-2-topaz.vercel.app",
     "https://urban-nest-sooty-mu.vercel.app",
     "https://urban-nest-git-main-kin12.vercel.app",
-    "https://bookit-ui.vercel.app/",
+    "https://bookit-ui.vercel.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
