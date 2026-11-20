@@ -288,14 +288,14 @@ def password_reset_verify(request):
     })
 
     response.set_cookie(
-        PASSWORD_RESET_COOKIE,
-        authorization,
-        max_age=600,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite="Lax",
-        path=PASSWORD_RESET_COOKIE_PATH,
-    )
+    PASSWORD_RESET_COOKIE,
+    authorization,
+    max_age=600,
+    httponly=True,
+    secure=not settings.DEBUG,
+    samesite="None" if not settings.DEBUG else "Lax",
+    path=PASSWORD_RESET_COOKIE_PATH,
+)
 
     return response
 
