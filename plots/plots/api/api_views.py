@@ -3,12 +3,16 @@ from datetime import timedelta
 import hashlib
 import hmac
 import secrets
+import json
+import logging
+
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.password_validation import validate_password
-from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Avg, Count, Q
@@ -34,18 +38,84 @@ from ..booking_notifications import (
     manager_users,
     send_booking_email,
 )
-
 from .serializers import (
     RegisterSerializer,
     HouseSerializer,
-    BookingSerializer,
-    HouseDetailSerializer,
     HouseSubmissionSerializer,
+    HouseDetailSerializer,
+    BookingSerializer,
+    BookingClarificationSerializer,
+    ManagerHouseSerializer,
+    HousePhotoSerializer,
+    ManagerAnnouncementSerializer,
+    ManagerInvitationSerializer,
 )
-
 
 PASSWORD_RESET_COOKIE = "password_reset_authorization"
 PASSWORD_RESET_COOKIE_PATH = "/api/auth/password-reset/"
+
+logger = logging.getLogger(__name__)
+
+
+def send_password_reset_email(recipient, otp):
+    api_key = settings.SENDLIBERTY_API_KEY
+
+    if not api_key:
+        raise RuntimeError("SENDLIBERTY_API_KEY is not configured.")
+
+    message = (
+        f"Your Urban Nest password reset code is {otp}. "
+        "It expires in 10 minutes."
+    )
+
+    payload = {
+        "from": settings.DEFAULT_FROM_EMAIL,
+        "to": recipient,
+        "subject": "Urban Nest password reset code",
+        "text": message,
+        "html": f"""
+            <div>
+                <h2>Urban Nest password reset</h2>
+                <p>Your verification code is:</p>
+                <h1>{otp}</h1>
+                <p>This code expires in 10 minutes.</p>
+                <p>If you did not request this, ignore this email.</p>
+            </div>
+        """,
+    }
+
+    req = Request(
+        "https://sendliberty.com/api/send",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(req, timeout=15) as response:
+            if not 200 <= response.status < 300:
+                raise RuntimeError(
+                    f"Sendliberty returned HTTP {response.status}."
+                )
+
+            return response.read()
+
+    except HTTPError as exc:
+        logger.error(
+            "Sendliberty rejected password reset email. HTTP status: %s",
+            exc.code,
+        )
+        raise RuntimeError("Email delivery failed.") from exc
+
+    except (URLError, TimeoutError, OSError) as exc:
+        logger.error(
+            "Sendliberty connection failed: %s",
+            exc,
+        )
+        raise RuntimeError("Email delivery failed.") from exc
 
 
 def err(msg, code=400):
@@ -200,18 +270,19 @@ def password_reset_request(request):
             reset.reset_authorization_expires_at = None
             reset.save()
 
-            sent = send_mail(
-                "Urban Nest password reset code",
-                f"Your password reset code is {otp}. It expires in 10 minutes.",
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
+        try:
+            send_password_reset_email(user.email, otp)
+
+        except RuntimeError:
+            logger.exception(
+                "Password reset email could not be sent."
             )
 
-            if not sent:
-                raise RuntimeError(
-                    "Password reset email was not accepted for delivery."
-                )
+            return err(
+                "The email service is temporarily unavailable. "
+                "Please try again shortly.",
+                503,
+            )
 
     return Response({
         "detail": (
@@ -288,14 +359,14 @@ def password_reset_verify(request):
     })
 
     response.set_cookie(
-    PASSWORD_RESET_COOKIE,
-    authorization,
-    max_age=600,
-    httponly=True,
-    secure=not settings.DEBUG,
-    samesite="None" if not settings.DEBUG else "Lax",
-    path=PASSWORD_RESET_COOKIE_PATH,
-)
+        PASSWORD_RESET_COOKIE,
+        authorization,
+        max_age=600,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="None" if not settings.DEBUG else "Lax",
+        path=PASSWORD_RESET_COOKIE_PATH,
+    )
 
     return response
 

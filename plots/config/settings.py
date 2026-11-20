@@ -158,9 +158,17 @@ STORAGES = {
     },
 }
 
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Urban Nest <no-reply@localhost>")
-URBAN_NEST_FRONTEND_URL = os.getenv("URBAN_NEST_FRONTEND_URL", "http://localhost:5173")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "Urban Nest <no-reply@localhost>"
+)
 
+SENDLIBERTY_API_KEY = os.getenv("SENDLIBERTY_API_KEY", "")
+
+URBAN_NEST_FRONTEND_URL = os.getenv(
+    "URBAN_NEST_FRONTEND_URL",
+    "http://localhost:5173"
+)
 # Email. Local development defaults to console output; SMTP configuration is
 # supplied only through environment variables.
 
